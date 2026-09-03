@@ -78,6 +78,7 @@
   #hud .msg::after{content:"▮";margin-left:4px;color:var(--senf);animation:blink 1.1s steps(1) infinite}
   #hud.alarm{border-left-color:var(--rot)} #hud.win{border-left-color:var(--senf)}
   #hud.win .msg{color:var(--senf);font-size:17px}
+  #hud.win.remis .msg{color:var(--elf)}
   @keyframes blink{50%{opacity:0}}
   .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px 2px 6px;font-size:11px;color:var(--elf-40)}
   .controls label{display:flex;flex-direction:column;gap:4px;letter-spacing:.1em}
@@ -137,7 +138,7 @@
     <select id="starter"><option value="1" selected>Senf (Du)</option><option value="2">Petrol</option></select>
   </label>
   <label>REGELN<span style="color:var(--elf);letter-spacing:0;font-size:12px;line-height:1.4;padding-top:5px">9 Steine, Springen bei 3</span></label>
-  <div id="stats"><span>BILANZ GEGEN COMPUTER: <b id="statW">0</b> Siege | <b id="statL">0</b> Niederlagen</span><button id="statReset">zurücksetzen</button></div>
+  <div id="stats"><span>BILANZ GEGEN COMPUTER: <b id="statW">0</b> Siege | <b id="statD">0</b> Remis | <b id="statL">0</b> Niederlagen</span><button id="statReset">zurücksetzen</button></div>
 </div>
 </div>
 
@@ -150,8 +151,9 @@ const MILLS_AT=POS.map((_,i)=>MILLS.filter(m=>m.includes(i)));
 const P1=1, P2=2; // Senf, Petrol
 
 /* ---------- Spiellogik ---------- */
-function newState(turn){ return {b:new Array(24).fill(0), hand:[0,9,9], turn}; }
-function clone(s){ return {b:s.b.slice(), hand:s.hand.slice(), turn:s.turn}; }
+function newState(turn){ return {b:new Array(24).fill(0), hand:[0,9,9], turn, nc:0}; } // nc = Züge ohne Schlag in der Ziehphase
+function clone(s){ return {b:s.b.slice(), hand:s.hand.slice(), turn:s.turn, nc:s.nc}; }
+function posKey(s){ return s.b.join('')+'|'+s.turn+'|'+s.hand[1]+'.'+s.hand[2]; }
 function count(b,p){ let n=0; for(const v of b) if(v===p) n++; return n; }
 function inMill(b,i,p){ return MILLS_AT[i].some(m=>b[m[0]]===p&&b[m[1]]===p&&b[m[2]]===p); }
 function removable(b,opp){
@@ -181,6 +183,7 @@ function apply(s,m,p){
   const n=clone(s);
   if(m.from>=0) n.b[m.from]=0; else n.hand[p]--;
   n.b[m.to]=p; if(m.remove>=0) n.b[m.remove]=0;
+  n.nc=(m.from>=0&&m.remove<0&&n.hand[1]===0&&n.hand[2]===0)?n.nc+1:0;
   n.turn=3-p; return n;
 }
 function isLoss(s,p){
@@ -188,56 +191,108 @@ function isLoss(s,p){
   if(s.hand[p]>0) return false;
   return genMoves(s,p).length===0;
 }
+// Remis: 'rep' = Stellung zum dritten Mal, 'fifty' = 50 Züge ohne Schlag. reps = Map Stellungsschlüssel -> Anzahl
+function drawReason(s,reps){
+  if(s.nc>=50) return 'fifty';
+  if((reps.get(posKey(s))||0)>=3) return 'rep';
+  return null;
+}
 
 /* ---------- KI ---------- */
-function evaluate(s,me){
+const LEVELS={1:{depth:2,budget:Infinity},2:{depth:4,budget:Infinity},3:{depth:12,budget:3000}};
+// Doppelmühle: Stein in einer Mühle, der auf ein freies Nachbarfeld ziehen kann und dort eine zweite Mühle schließt
+function doubleMills(b,p){
+  let n=0;
+  for(let i=0;i<24;i++){
+    if(b[i]!==p||!inMill(b,i,p)) continue;
+    b[i]=0;
+    for(const j of ADJ[i]){ if(b[j]!==0) continue; b[j]=p; const hit=inMill(b,j,p); b[j]=0; if(hit){ n++; break; } }
+    b[i]=p;
+  }
+  return n;
+}
+function evaluate(s,me,level){
   const b=s.b, opp=3-me;
-  let mat=(count(b,me)+s.hand[me])-(count(b,opp)+s.hand[opp]);
+  const mat=(count(b,me)+s.hand[me])-(count(b,opp)+s.hand[opp]);
   let mills=0,two=0,mob=0,blocked=0;
   for(const m of MILLS){
     let a=0,o=0; for(const i of m){ if(b[i]===me)a++; else if(b[i]===opp)o++; }
     if(a===3) mills++; else if(o===3) mills--;
     else if(a===2&&o===0) two++; else if(o===2&&a===0) two--;
   }
-  if(s.hand[me]===0||s.hand[opp]===0){
+  if(level===1) return 30*mat+9*mills;
+  // Beweglichkeit: Mittel erst ab der Ziehphase (unverändert), Schwer immer, damit Blockaden schon beim Setzen zählen
+  let ownBlocked=0;
+  if(level===3||s.hand[me]===0||s.hand[opp]===0){
     for(let i=0;i<24;i++){
       if(b[i]===0) continue;
       const free=ADJ[i].filter(j=>b[j]===0).length;
-      if(b[i]===me) mob+=free; else { mob-=free; if(free===0) blocked++; }
+      if(b[i]===me){ mob+=free; if(free===0) ownBlocked++; } else { mob-=free; if(free===0) blocked++; }
     }
   }
-  return 30*mat+9*mills+4*two+2*mob+3*blocked;
+  if(level!==3) return 30*mat+9*mills+4*two+2*mob+3*blocked;
+  const placing=s.hand[1]>0||s.hand[2]>0;
+  const dbl=doubleMills(b,me)-doubleMills(b,opp);
+  return 30*mat+9*mills+(placing?6:3)*two+2*mob+5*(blocked-ownBlocked)+25*dbl;
+}
+// Zugsortierung: Schlagzüge, dann Züge, die eine offene gegnerische Zweierreihe blockieren, dann Rest
+function orderMoves(b,p,moves){
+  const opp=3-p;
+  const rank=m=>m.remove>=0?2:MILLS_AT[m.to].some(ml=>ml.every(i=>i===m.to||b[i]===opp))?1:0;
+  return moves.map(m=>({m,r:rank(m)})).sort((x,y)=>y.r-x.r).map(x=>x.m);
 }
 let nodes=0, deadline=0;
-function search(s,p,depth,alpha,beta,me){
+// K = Kontext der laufenden Zugberechnung: hist = Stellungen der Partie, path = Stellungen im Suchpfad,
+// tt = Zugtabelle (Stellungsschlüssel -> {d: Tiefe, v: Wert, f: 0 exakt | 1 untere Schranke | 2 obere Schranke})
+const K={me:P2,level:2,hist:new Map(),path:new Map(),tt:new Map(),repAdj:0};
+function search(s,p,depth,alpha,beta){
   if((++nodes&511)===0&&Date.now()>deadline) throw 'timeout';
+  const me=K.me;
   if(isLoss(s,p)) return p===me?-10000-depth:10000+depth;
-  if(depth===0) return evaluate(s,me);
-  const moves=genMoves(s,p).sort((a,b)=>(b.remove>=0)-(a.remove>=0));
-  if(p===me){
-    let best=-Infinity;
-    for(const m of moves){ const v=search(apply(s,m,p),3-p,depth-1,alpha,beta,me); if(v>best)best=v; if(best>alpha)alpha=best; if(alpha>=beta)break; }
-    return best;
+  if(s.nc>=50) return 0;
+  let key=null, adj=0;
+  if(K.level===3){
+    key=posKey(s);
+    const seen=(K.hist.get(key)||0)+(K.path.get(key)||0);
+    if(seen>=2) return 0;
+    if(seen>0) adj=K.repAdj;
+    const e=K.tt.get(key);
+    if(e&&e.d>=depth){ if(e.f===0) return e.v; if(e.f===1&&e.v>=beta) return e.v; if(e.f===2&&e.v<=alpha) return e.v; }
   }
-  let best=Infinity;
-  for(const m of moves){ const v=search(apply(s,m,p),3-p,depth-1,alpha,beta,me); if(v<best)best=v; if(best<beta)beta=best; if(alpha>=beta)break; }
+  if(depth===0) return evaluate(s,me,K.level)+adj;
+  const moves=orderMoves(s.b,p,genMoves(s,p)), a0=alpha, b0=beta;
+  if(key) K.path.set(key,(K.path.get(key)||0)+1);
+  let best;
+  if(p===me){
+    best=-Infinity;
+    for(const m of moves){ const v=search(apply(s,m,p),3-p,depth-1,alpha,beta); if(v>best)best=v; if(best>alpha)alpha=best; if(alpha>=beta)break; }
+  } else {
+    best=Infinity;
+    for(const m of moves){ const v=search(apply(s,m,p),3-p,depth-1,alpha,beta); if(v<best)best=v; if(best<beta)beta=best; if(alpha>=beta)break; }
+  }
+  if(key){ K.path.set(key,K.path.get(key)-1); }
+  best+=adj;
+  if(key) K.tt.set(key,{d:depth,v:best,f:best<=a0?2:best>=b0?1:0});
   return best;
 }
-function bestMove(s,me,level){
+function bestMove(s,me,level,hist){
   let moves=genMoves(s,me);
   if(!moves.length) return null;
-  if(level===1&&Math.random()<0.4) return moves[Math.random()*moves.length|0];
-  const budget=level===1?60:level===2?450:2000, maxDepth=level===1?1:level===2?4:10;
-  deadline=Date.now()+budget; nodes=0;
+  const cfg=LEVELS[level]||LEVELS[2];
+  K.me=me; K.level=level; K.hist=hist||new Map(); K.tt=new Map(); K.path=new Map();
+  K.repAdj=level===3?(evaluate(s,me,3)>=0?-15:15):0; // bei Vorteil Wiederholung meiden, bei Nachteil anstreben
+  deadline=Date.now()+cfg.budget; nodes=0;
   let best=moves[0];
   try{
-    for(let d=1;d<=maxDepth;d++){
-      const scored=moves.map(m=>({m,v:search(apply(s,m,me),3-me,d-1,-Infinity,Infinity,me)}));
-      scored.sort((a,b)=>b.v-a.v);
+    for(let d=level===3?1:cfg.depth;d<=cfg.depth;d++){
+      K.path.clear();
+      const scored=moves.map(m=>({m,v:search(apply(s,m,me),3-me,d-1,-Infinity,Infinity)}));
+      scored.sort((x,y)=>y.v-x.v);
       moves=scored.map(x=>x.m); best=moves[0];
       if(scored[0].v>9000) break;
     }
   }catch(e){}
+  if(level===1&&Math.random()<0.3) best=moves[Math.random()*Math.min(3,moves.length)|0];
   return best;
 }
 
@@ -261,6 +316,7 @@ const SFX={
   take:()=>tone(160,0.22,'sawtooth',0.06),
   win:()=>[440,554,659,880].forEach((f,i)=>setTimeout(()=>tone(f,0.18,'triangle'),i*110)),
   lose:()=>[330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'sawtooth',0.05),i*160)),
+  draw:()=>{tone(494,0.14,'triangle',0.06);setTimeout(()=>tone(494,0.14,'triangle',0.06),200);},
 };
 
 /* ---------- Speicher ---------- */
@@ -268,13 +324,13 @@ const store={
   get(k,d){ try{ const v=localStorage.getItem('muehle:'+k); return v===null?d:JSON.parse(v);}catch(e){return d;} },
   set(k,v){ try{ localStorage.setItem('muehle:'+k,JSON.stringify(v)); }catch(e){} }
 };
-let stats=store.get('stats',{w:0,l:0});
+let stats=store.get('stats',{w:0,d:0,l:0}); stats.d=stats.d||0;
 
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
 const STEP=12.2, OFF=13.4;
 const xy=i=>[OFF+POS[i][0]*STEP,OFF+POS[i][1]*STEP];
-let S, mode, selected=-1, lastTo=-1, over=false, thinking=false, cap=[0,0,0], history=[], moveNo=0, twoPlayer=false;
+let S, mode, selected=-1, lastTo=-1, over=false, thinking=false, cap=[0,0,0], history=[], moveNo=0, twoPlayer=false, reps=new Map();
 const isHumanTurn=()=>twoPlayer||S.turn===P1;
 const nameOf=p=>p===P1?(twoPlayer?'SENF':'DU'):(twoPlayer?'PETROL':'COMPUTER');
 
@@ -326,11 +382,13 @@ function render(){
   $('capS').textContent=cap[P1]; $('capP').textContent=cap[P2];
   $('nameS').textContent=nameOf(P1); $('nameP').textContent=nameOf(P2);
   $('undoBtn').disabled=over||thinking||!history.length;
-  $('statW').textContent=stats.w; $('statL').textContent=stats.l;
+  $('statW').textContent=stats.w; $('statD').textContent=stats.d; $('statL').textContent=stats.l;
 }
 function hud(msg,cls){
   const ph={place:'SETZEN',move:'ZIEHEN',fly:'SPRINGEN'}[phase(S,S.turn)];
-  $('hudRow').textContent=`ZUG ${String(moveNo).padStart(2,'0')} | PHASE ${ph} | ${nameOf(S.turn)} AM ZUG`;
+  let row=`ZUG ${String(moveNo).padStart(2,'0')} | PHASE ${ph} | ${nameOf(S.turn)} AM ZUG`;
+  if(S.hand[P1]===0&&S.hand[P2]===0) row+=` | OHNE SCHLAG ${String(S.nc).padStart(2,'0')}`;
+  $('hudRow').textContent=row;
   $('hudMsg').textContent=msg; $('hud').className=cls||'';
 }
 function statusForHuman(){
@@ -341,23 +399,23 @@ function statusForHuman(){
   if(ph==='fly') return hud(`${who}: nur noch 3 Steine - Springen erlaubt.`);
   hud(selected>=0?'Zielfeld wählen.':`${who}: Stein zum Ziehen wählen.`);
 }
-function snapshot(){ history.push({S:clone(S),cap:cap.slice(),lastTo,moveNo}); if(history.length>60) history.shift(); }
+function snapshot(){ history.push({S:clone(S),cap:cap.slice(),lastTo,moveNo,reps:new Map(reps)}); if(history.length>60) history.shift(); }
 
 function onTap(i){
   if(over||thinking||!isHumanTurn()) return;
   const p=S.turn, b=S.b;
   if(mode==='remove'){
-    if(removable(b,3-p).includes(i)){ b[i]=0; cap[p]++; mode='play'; SFX.take(); endTurn(); }
+    if(removable(b,3-p).includes(i)){ b[i]=0; cap[p]++; S.nc=0; mode='play'; SFX.take(); endTurn(); }
     return;
   }
   const ph=phase(S,p);
   if(ph==='place'){
     if(b[i]!==0) return;
-    snapshot(); b[i]=p; S.hand[p]--; lastTo=i; SFX.place(); afterMove(i); return;
+    snapshot(); b[i]=p; S.hand[p]--; S.nc=0; lastTo=i; SFX.place(); afterMove(i); return;
   }
   if(b[i]===p){ selected=(selected===i)?-1:i; render(); statusForHuman(); return; }
   if(selected>=0&&b[i]===0&&(ph==='fly'||ADJ[selected].includes(i))){
-    snapshot(); b[selected]=0; b[i]=p; lastTo=i; selected=-1; SFX.move(); afterMove(i);
+    snapshot(); b[selected]=0; b[i]=p; S.nc++; lastTo=i; selected=-1; SFX.move(); afterMove(i);
   }
 }
 function afterMove(i){
@@ -365,17 +423,27 @@ function afterMove(i){
   if(inMill(S.b,i,p)&&count(S.b,3-p)>0){ mode='remove'; SFX.mill(); render(); statusForHuman(); }
   else endTurn();
 }
+// Stellung eintragen, dann Verlust und Remis prüfen. Liefert true, wenn die Partie zu Ende ist.
+function recordAndCheck(mover){
+  const k=posKey(S); reps.set(k,(reps.get(k)||0)+1);
+  if(isLoss(S,S.turn)){ finish(mover); return true; }
+  const d=drawReason(S,reps); if(d){ finishDraw(d); return true; }
+  return false;
+}
 function endTurn(){
   const p=S.turn; S.turn=3-p; render();
-  if(isLoss(S,S.turn)){ finish(p); return; }
+  if(recordAndCheck(p)) return;
   if(twoPlayer){ statusForHuman(); return; }
+  aiTurn();
+}
+function aiTurn(){
   thinking=true; hud('Computer berechnet Zug …'); render();
   setTimeout(()=>{
-    const m=bestMove(S,P2,+$('level').value);
+    const m=bestMove(S,P2,+$('level').value,reps);
     S=apply(S,m,P2); lastTo=m.to; moveNo++;
     if(m.remove>=0){ cap[P2]++; SFX.take(); } else if(m.from<0) SFX.place(); else SFX.move();
     thinking=false; render();
-    if(isLoss(S,P1)){ finish(P2); return; }
+    if(recordAndCheck(P2)) return;
     statusForHuman();
   },380);
 }
@@ -386,17 +454,24 @@ function finish(winner){
   else { stats.l++; hud('Der Computer hat gewonnen.','alarm'); SFX.lose(); }
   store.set('stats',stats); render();
 }
+function finishDraw(reason){
+  over=true; render();
+  hud(reason==='rep'?'Remis - Stellung dreimal wiederholt.':'Remis - 50 Züge ohne Schlag.','win remis'); SFX.draw();
+  if(twoPlayer) return;
+  stats.d++; store.set('stats',stats); render();
+}
 function undo(){
   if(!history.length||over||thinking) return;
-  const h=history.pop(); S=h.S; cap=h.cap; lastTo=h.lastTo; moveNo=h.moveNo;
+  const h=history.pop(); S=h.S; cap=h.cap; lastTo=h.lastTo; moveNo=h.moveNo; reps=h.reps;
   mode='play'; selected=-1; render(); statusForHuman();
 }
 function newGame(){
   twoPlayer=$('modeSel').value==='2p';
-  S=newState(+$('starter').value); mode='play'; selected=-1; lastTo=-1; over=false; thinking=false; cap=[0,0,0]; history=[]; moveNo=0;
+  S=newState(+$('starter').value); mode='play'; selected=-1; lastTo=-1; over=false; thinking=false; cap=[0,0,0]; history=[]; moveNo=0; reps=new Map();
+  reps.set(posKey(S),1);
   store.set('settings',{mode:$('modeSel').value,level:$('level').value,starter:$('starter').value,sound:soundOn});
   render();
-  if(!twoPlayer&&S.turn===P2){ S.turn=P1; endTurn(); } else statusForHuman();
+  if(!twoPlayer&&S.turn===P2) aiTurn(); else statusForHuman();
 }
 (function init(){
   const st=store.get('settings',null);
@@ -408,7 +483,7 @@ function newGame(){
   $('starter').addEventListener('change',newGame);
   $('level').addEventListener('change',()=>store.set('settings',{mode:$('modeSel').value,level:$('level').value,starter:$('starter').value,sound:soundOn}));
   $('soundBtn').addEventListener('click',()=>{ soundOn=!soundOn; $('soundBtn').textContent=soundOn?'Ton an':'Ton aus'; if(soundOn) tone(660,0.08,'triangle'); store.set('settings',{mode:$('modeSel').value,level:$('level').value,starter:$('starter').value,sound:soundOn}); });
-  $('statReset').addEventListener('click',()=>{ stats={w:0,l:0}; store.set('stats',stats); render(); });
+  $('statReset').addEventListener('click',()=>{ stats={w:0,d:0,l:0}; store.set('stats',stats); render(); });
   newGame();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();

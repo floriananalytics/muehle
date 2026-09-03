@@ -1,6 +1,6 @@
 // Bei jeder Änderung an der App diese Versionsnummer hochzählen,
 // sonst behalten installierte Geräte die alte Version im Cache.
-const CACHE = 'muehle-v1';
+const CACHE = 'muehle-v2';
 const FILES = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './icon-512-maskable.png'];
 
 self.addEventListener('install', e => {
