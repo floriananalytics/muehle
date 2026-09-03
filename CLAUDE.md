@@ -1,6 +1,6 @@
-# CLAUDE.md - Mühle (PWA)
+# CLAUDE.md - Konsole (PWA)
 
-Privates Hobbyprojekt von Florian. Installierbare Web-App (GitHub Pages), Spielesammlung: aktuell Mühle und Vier gewinnt. App-Name bleibt "Mühle".
+Privates Hobbyprojekt von Florian. Installierbare Web-App (GitHub Pages), Spielesammlung "Konsole": aktuell Mühle und Vier gewinnt. App-Name (Manifest, Titel, Spielauswahl) ist "Konsole"; Pfad `/muehle/`, Repo-Name, Cache-Präfix `muehle-v<n>` und localStorage-Präfix `muehle:` bleiben aus Kompatibilitätsgründen, damit installierte Geräte nichts migrieren müssen.
 Live: https://floriananalytics.github.io/muehle/
 
 ## Sprache und Stil
@@ -14,9 +14,9 @@ Live: https://floriananalytics.github.io/muehle/
   - `index.html` - Hülle: Spielauswahl, Startmenü, Header, HUD, Ton/Vibration, Bilanz, localStorage, Service-Worker-Registrierung. Kein spielspezifischer Code.
   - `games/muehle.js` - Mühle (Brettmodell, Regeln, KI, SVG-Brett, Animationen).
   - `games/vier-gewinnt.js` - Vier gewinnt; dieselbe Datei läuft bei Schwer als Web Worker und unter Node.
-- `manifest.json`, `sw.js` (Service Worker, Netz zuerst mit Cache-Rückfall; `FILES` enthält beide Module), Icons `icon-192.png`, `icon-512.png`, `icon-512-maskable.png`.
+- `manifest.json` (Name "Konsole"), `sw.js` (Service Worker, Netz zuerst mit Cache-Rückfall; `FILES` enthält beide Module), Icons `icon-192.png`, `icon-512.png`, `icon-512-maskable.png`: 7x7-Raster in Elfenbein auf Schwarz, darauf vier Steine in Senf, Petrol, Zinnober und Nebelblau mit dunklem Kern, Eckklammern in Senf (nicht auf dem maskable-Icon, das einen Sicherheitsrand von 22 % hat). Erzeugt mit Pillow, Skript nicht im Repo. Das Mühle-Motiv gibt es nur noch als Kachelvorschau.
 - Alle Pfade relativ (`./`), weil die App unter `/muehle/` liegt, nicht im Root.
-- Speicherung nur in `localStorage` unter dem Präfix `muehle:`: `settings:<spiel-id>` (mode/level/starter), `stats:<spiel-id>` (w/d/l), `sound`, `lastGame`. Alte Schlüssel `stats` und `settings` werden beim Start einmalig nach `:muehle` migriert. Keine Server, kein Tracking.
+- Speicherung nur in `localStorage` unter dem Präfix `muehle:`: `settings:<spiel-id>` (mode/level/starter), `stats:<spiel-id>` (w/d/l), `sound`, `lastGame`, `newVersion` (Merker für den Versionshinweis). Alte Schlüssel `stats` und `settings` werden beim Start einmalig nach `:muehle` migriert. Keine Server, kein Tracking.
 
 ## Schnittstelle der Spielmodule
 - Ein Objekt je Datei unter `window.GAMES[id]`; unter Node exportiert `module.exports` die Logikfunktionen für Prüfungen.
@@ -71,7 +71,9 @@ Live: https://floriananalytics.github.io/muehle/
 - Monospace-Schrift für alles, Koordinatenring A-G / 1-7, Eckklammern in Senf, Scanlinien-Overlay.
 - Bewegung sparsam: nur als Antwort auf Aktionen (Zug, Mühle, Schlag), `prefers-reduced-motion` respektieren.
 - Touch-Ziele mindestens 44 px; Hit-Kreise im SVG bleiben groß (r=6 im 100er-Viewbox).
-- Startmenü (`#menu`, Overlay im Bordcomputer-Stil): oberste Ebene Spielauswahl (Titel "SPIELE", Kacheln); danach je Spiel: Link "Zurück zur Spielauswahl", Titel, große Schaltflächen "Gegen Computer" | "Zwei Spieler" (Modus, gewählter in Senf), Segmente Stärke (nur bei Computer) und Anfang ("Ich" | "Computer" bzw. "Senf" | "Petrol"), "Weiterspielen" (nur bei laufender Partie) und "Neue Partie", Bilanz mit "zurücksetzen", Link "Regeln". Modus und Anfang wirken erst bei "Neue Partie", Stärke sofort. Header im Spiel zeigt Name und Untertitel des aktiven Spiels aus `meta` und die Knöpfe "◀ Zug", "Ton an/aus", "Menü". Beim Start öffnet sich das Menü des zuletzt gespielten Spiels, sonst die Spielauswahl. Escape schließt Regeln bzw. das Menü (nur bei laufender Partie). Unter dem Brett steht nur das HUD.
+- Startmenü (`#menu`, Overlay im Bordcomputer-Stil): oberste Ebene Spielauswahl (Titel "KONSOLE", Untertitel "SPIELESAMMLUNG", Kacheln); danach je Spiel: Link "Zurück zur Spielauswahl", Titel, große Schaltflächen "Gegen Computer" | "Zwei Spieler" (Modus, gewählter in Senf), Segmente Stärke (nur bei Computer) und Anfang ("Ich" | "Computer" bzw. "Senf" | "Petrol"), "Weiterspielen" (nur bei laufender Partie) und "Neue Partie", Bilanz mit "zurücksetzen", Link "Regeln". Modus und Anfang wirken erst bei "Neue Partie", Stärke sofort. Header im Spiel zeigt Name und Untertitel des aktiven Spiels aus `meta` und die Knöpfe "◀ Zug", "Ton an/aus", "Menü". Beim Start öffnet sich das Menü des zuletzt gespielten Spiels, sonst die Spielauswahl. Header ohne geladenes Spiel: "KONSOLE".
+- Rückfrage (`#confirm`, gleicher Stil): "Laufende Partie beenden?" mit "Beenden" | "Zurück" vor einem Spielwechsel und vor "Neue Partie", solange eine Partie läuft (`started && !over`); Escape wirkt wie "Zurück".
+- Versionshinweis: Löst ein neuer Service Worker einen vorhandenen ab (`controllerchange` bei bestehendem Controller), zeigt das HUD einmalig "Neue Version geladen."; läuft gerade eine Partie, wird der Hinweis über `muehle:newVersion` auf den nächsten Start verschoben. Escape schließt Regeln bzw. das Menü (nur bei laufender Partie). Unter dem Brett steht nur das HUD.
 - Regel-Overlay (`#rules`): gleicher Stil, 8 kurze Absätze, "Schließen" oben rechts.
 - Animationen, nur als Antwort auf Aktionen; `prefers-reduced-motion: reduce` schaltet alle ab (CSS) und entfernt geschlagene Steine sofort (JS `reduceMotion()`):
   - Steine sind `<g class="stone-g">` mit `style.transform=translate(x px, y px)`; `render()` verwendet Elemente je Feld wieder (`stoneEls`), Ziehen verschiebt nur das Element (Transition 180 ms ease-out), Setzen skaliert 0,6 -> 1 (120 ms, Klasse `pop`), Schlagen zerfällt (250 ms, Klasse `gone` + Elfenbein-Ring), Mühle blitzt zweimal 150 ms (Klasse `flash` auf Steinen und Mühlenlinie, `flashMill`). Rückgängig und Neustart rendern ohne Animation (`render({reset:true})`).
@@ -86,6 +88,7 @@ Live: https://floriananalytics.github.io/muehle/
 - Stärkestufen spürbar getrennt (Änderungsauftrag 1).
 - Startmenü, Animationen (Gleiten, Mühle-Blitz, Zerfall beim Schlag), Vibration, Regel-Overlay (Änderungsauftrag 2).
 - Spielesammlung: Hülle und Module, Spielauswahl, Vier gewinnt, erweiterte Palette, iPhone-Ton (Änderungsauftrag 3).
+- Umbenennung in "Konsole", neues Icon, Rückfrage beim Spielwechsel, Versionshinweis (Änderungsauftrag 4).
 
 ## Offene Punkte (Reihenfolge)
 1. Zugvorschlag (Regelerklärung als Overlay ist mit Auftrag 2 umgesetzt).

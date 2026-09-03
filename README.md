@@ -1,6 +1,6 @@
-# Mühle
+# Konsole
 
-Spielesammlung als installierbare Web-App (PWA), aktuell Mühle und Vier gewinnt - gegen den Computer oder zu zweit am selben Handy.
+Spielesammlung unter https://floriananalytics.github.io/muehle/ mit Mühle und Vier gewinnt, als installierbare Web-App (PWA) - gegen den Computer oder zu zweit am selben Handy.
 
 **Spielen:** https://floriananalytics.github.io/muehle/  
 Auf dem Handy öffnen und über "Zum Startbildschirm hinzufügen" installieren. Läuft danach auch offline.

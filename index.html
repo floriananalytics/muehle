@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#0c0a0c">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Mühle">
+<meta name="apple-mobile-web-app-title" content="Konsole">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icon-192.png">
 <link rel="apple-touch-icon" href="./icon-192.png">
-<title>Mühle</title>
+<title>Konsole</title>
 <style>
   :root{
     --schwarz:#0c0a0c; --schwarz2:#151216; --elf:#f0e2c4; --elf-40:rgba(240,226,196,.4); --elf-15:rgba(240,226,196,.15); --rot:#b8322a;
@@ -104,6 +104,8 @@
   .link.back{padding:0 0 14px;display:block}
   .phead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
   .phead h2{margin:0;font-weight:500;font-size:16px;letter-spacing:.3em}
+  #confirm .panel h2{margin:0 0 18px;font-weight:500;font-size:16px;letter-spacing:.2em;line-height:1.5}
+  #confirm .panel{max-width:360px;margin-top:12vh}
   #rulesBody p{margin:0 0 10px;line-height:1.5;font-size:13px}
   #rulesBody p b{color:var(--akzent-text);font-weight:500}
   @media (prefers-reduced-motion:reduce){ #hud .msg::after,#hud.pulse{animation:none} #bar{display:none} }
@@ -112,7 +114,7 @@
 <body>
 <div class="frame">
 <header>
-  <h1 id="title">MÜHLE<small id="subtitle">SPIELESAMMLUNG</small></h1>
+  <h1 id="title">KONSOLE<small id="subtitle">SPIELESAMMLUNG</small></h1>
   <div class="btns">
     <button id="undoBtn" title="Rückgängig" disabled>◀ Zug</button>
     <button id="soundBtn" title="Ton">Ton an</button>
@@ -126,7 +128,7 @@
 <div id="menu" class="overlay" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
   <div class="panel" id="selectView">
     <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
-    <h1>SPIELE<small>SPIELESAMMLUNG</small></h1>
+    <h1>KONSOLE<small>SPIELESAMMLUNG</small></h1>
     <div class="tiles" id="tiles"></div>
     <button class="link" id="selResume" hidden>Weiterspielen</button>
   </div>
@@ -148,6 +150,14 @@
     </div>
     <div id="stats"><span>BILANZ GEGEN COMPUTER: <b id="statW">0</b> Siege | <b id="statD">0</b> Remis | <b id="statL">0</b> Niederlagen</span><button id="statReset">zurücksetzen</button></div>
     <button class="link" id="rulesBtn">Regeln</button>
+  </div>
+</div>
+
+<div id="confirm" class="overlay" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+  <div class="panel">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <h2 id="confirmTitle">LAUFENDE PARTIE BEENDEN?</h2>
+    <div class="actions"><button class="big" id="confirmYes">Beenden</button><button class="big" id="confirmNo">Zurück</button></div>
   </div>
 </div>
 
@@ -293,15 +303,28 @@ function openRules(){
   $('rules').classList.add('open'); $('rulesClose').focus();
 }
 function closeRules(){ $('rules').classList.remove('open'); $('rulesBtn').focus(); }
+// Rückfrage, wenn eine Partie läuft: erst nach "Beenden" wird die Aktion ausgeführt
+let pendingConfirm=null;
+function confirmEnd(action){
+  if(!(started&&!over)){ action(); return; }
+  pendingConfirm=action; $('confirm').classList.add('open'); $('confirmNo').focus();
+}
+function closeConfirm(){ $('confirm').classList.remove('open'); pendingConfirm=null; }
+// Versionshinweis: einmalig, wenn ein neuer Service Worker eine bereits installierte Version abgelöst hat
+function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); return; } store.del('newVersion'); hooks.hudRow(''); hooks.hud('Neue Version geladen.'); }
 
 (function init(){
   buildTiles();
   $('soundBtn').textContent=soundOn?'Ton an':'Ton aus';
   $('menuBtn').addEventListener('click',()=>openMenu(game?'game':'select'));
-  $('tiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t) return; if(t.dataset.g!==gameId) loadGame(t.dataset.g); showGameMenu(); });
+  $('tiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t) return; const id=t.dataset.g;
+    if(id===gameId){ showGameMenu(); return; }
+    confirmEnd(()=>{ loadGame(id); showGameMenu(); }); });
+  $('confirmYes').addEventListener('click',()=>{ const a=pendingConfirm; closeConfirm(); if(a) a(); });
+  $('confirmNo').addEventListener('click',closeConfirm);
   $('selResume').addEventListener('click',closeMenu);
   $('backBtn').addEventListener('click',showSelect);
-  $('newBtn').addEventListener('click',()=>{ newGame(); closeMenu(); });
+  $('newBtn').addEventListener('click',()=>confirmEnd(()=>{ newGame(); closeMenu(); }));
   $('resumeBtn').addEventListener('click',closeMenu);
   $('undoBtn').addEventListener('click',()=>{ if(game) game.undo(); refreshUndo(); });
   $('modeAi').addEventListener('click',()=>{ settings.mode='ai'; saveSettings(); updateMenu(); });
@@ -314,13 +337,19 @@ function closeRules(){ $('rules').classList.remove('open'); $('rulesBtn').focus(
   $('rulesClose').addEventListener('click',closeRules);
   document.addEventListener('keydown',e=>{
     if(e.key!=='Escape') return;
-    if($('rules').classList.contains('open')) closeRules();
+    if($('confirm').classList.contains('open')) closeConfirm();
+    else if($('rules').classList.contains('open')) closeRules();
     else if($('menu').classList.contains('open')&&started&&!over) closeMenu();
   });
   hooks.hud('Spiel im Menü wählen.');
   const last=store.get('lastGame',null);
   if(last&&GAMES[last]){ loadGame(last); openMenu('game'); } else openMenu('select');
-  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if(store.get('newVersion',false)) noteNewVersion();
+  if('serviceWorker' in navigator){
+    let controlled=!!navigator.serviceWorker.controller; // erste Installation ist keine Aktualisierung
+    navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(controlled) noteNewVersion(); controlled=true; });
+    navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  }
 })();
 </script>
 </body>
