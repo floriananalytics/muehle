@@ -2,7 +2,7 @@
 
 Das klassische Brettspiel als installierbare Web-App (PWA) - gegen den Computer oder zu zweit am selben Handy.
 
-**Spielen:** https://florianalytics.github.io/muehle/  
+**Spielen:** https://floriananalytics.github.io/muehle/  
 Auf dem Handy öffnen und über "Zum Startbildschirm hinzufügen" installieren. Läuft danach auch offline.
 
 ## Dateien
