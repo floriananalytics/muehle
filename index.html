@@ -84,6 +84,7 @@
   .panel h1{margin:0 0 20px}
   .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .tile{padding:10px;border:1px solid var(--rauch);text-align:left;color:var(--elf);border-radius:3px}
+  .tile.last{box-shadow:0 0 0 1px currentColor} /* zuletzt gespielt: doppelter Akzentrahmen, Farbe kommt aus der Kachel */
   .tile svg{width:100%;aspect-ratio:1;display:block;margin-bottom:8px}
   .tile .tname{display:block;font-size:12px;letter-spacing:.18em}
   .tile small{display:block;font-size:9px;letter-spacing:.14em;color:var(--elf-40);margin-top:3px}
@@ -281,8 +282,10 @@ function newGame(){
 /* Menü und Regeln */
 function buildTiles(){
   $('tiles').innerHTML=GAME_ORDER.filter(id=>GAMES[id]).map(id=>{ const m=GAMES[id].meta;
-    return `<button class="tile" data-g="${id}" style="border-color:${m.akzent.hex}">${m.vorschau()}<span class="tname">${m.name}</span><small>${m.untertitel}</small></button>`; }).join('');
+    return `<button class="tile" data-g="${id}" style="border-color:${m.akzent.hex};--tile:${m.akzent.hex}">${m.vorschau()}<span class="tname">${m.name}</span><small>${m.untertitel}</small></button>`; }).join('');
 }
+function markLastTile(){ const last=store.get('lastGame',null);
+  for(const t of $('tiles').children){ const on=t.dataset.g===last; t.classList.toggle('last',on); t.style.color=on?t.style.getPropertyValue('--tile'):''; if(on) t.setAttribute('aria-current','true'); else t.removeAttribute('aria-current'); } }
 function updateMenu(){
   const ai=settings.mode==='ai', f=game.meta.farben;
   $('modeAi').classList.toggle('on',ai); $('modeAi').setAttribute('aria-pressed',ai);
@@ -294,7 +297,7 @@ function updateMenu(){
   $('resumeBtn').hidden=!(started&&!over);
   $('statW').textContent=stats.w; $('statD').textContent=stats.d; $('statL').textContent=stats.l;
 }
-function showSelect(){ $('selectView').hidden=false; $('gameView').hidden=true; $('selResume').hidden=!(started&&!over); const t=$('tiles').querySelector(gameId?`[data-g="${gameId}"]`:'.tile'); if(t) t.focus(); }
+function showSelect(){ markLastTile(); $('selectView').hidden=false; $('gameView').hidden=true; $('selResume').hidden=!(started&&!over); const t=$('tiles').querySelector(gameId?`[data-g="${gameId}"]`:'.tile'); if(t) t.focus(); }
 function showGameMenu(){ updateMenu(); $('selectView').hidden=true; $('gameView').hidden=false; ($('resumeBtn').hidden?$('modeAi'):$('resumeBtn')).focus(); }
 function openMenu(view){ $('menu').classList.add('open'); if(view==='select'||!game) showSelect(); else showGameMenu(); }
 function closeMenu(){ $('menu').classList.remove('open'); }
@@ -342,8 +345,7 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
     else if($('menu').classList.contains('open')&&started&&!over) closeMenu();
   });
   hooks.hud('Spiel im Menü wählen.');
-  const last=store.get('lastGame',null);
-  if(last&&GAMES[last]){ loadGame(last); openMenu('game'); } else openMenu('select');
+  openMenu('select'); // beim Start immer die Spielauswahl; muehle:lastGame markiert nur die Kachel
   if(store.get('newVersion',false)) noteNewVersion();
   if('serviceWorker' in navigator){
     let controlled=!!navigator.serviceWorker.controller; // erste Installation ist keine Aktualisierung
