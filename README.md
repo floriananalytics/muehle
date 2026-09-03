@@ -1,12 +1,13 @@
 # Mühle
 
-Das klassische Brettspiel als installierbare Web-App (PWA) - gegen den Computer oder zu zweit am selben Handy.
+Spielesammlung als installierbare Web-App (PWA), aktuell Mühle und Vier gewinnt - gegen den Computer oder zu zweit am selben Handy.
 
 **Spielen:** https://floriananalytics.github.io/muehle/  
 Auf dem Handy öffnen und über "Zum Startbildschirm hinzufügen" installieren. Läuft danach auch offline.
 
 ## Dateien
-- `index.html` - das komplette Spiel (Regeln, KI, Oberfläche)
+- `index.html` - Hülle: Startmenü, Kopfzeile, HUD, Ton, Bilanz
+- `games/muehle.js`, `games/vier-gewinnt.js` - je ein Spielmodul (Regeln, KI, Brett)
 - `manifest.json` - App-Name, Icon, Vollbild
 - `sw.js` - Service Worker für Offline-Betrieb
 - `icon-*.png` - App-Icons
