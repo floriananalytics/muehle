@@ -36,7 +36,9 @@
   header{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 2px 10px;border-bottom:1px solid var(--elf-15)}
   h1{margin:0;font-weight:500;font-size:26px;letter-spacing:.32em;color:var(--elf)}
   h1 small{display:block;font-size:10px;letter-spacing:.18em;color:var(--elf-40);margin-top:2px}
-  .btns{display:flex;gap:6px}
+  .btns{display:flex;gap:6px;flex-shrink:0}
+  .btns button{white-space:nowrap}
+  @media (max-width:380px){.btns button{padding:7px 7px;font-size:11px} h1{font-size:22px}}
   button,select{
     font:inherit;font-size:12px;letter-spacing:.06em;color:var(--elf);background:transparent;
     border:1px solid var(--elf-40);border-radius:3px;padding:7px 10px;cursor:pointer;
@@ -55,8 +57,8 @@
   svg{width:100%;height:100%;display:block}
   .grid{stroke:var(--petrol-d);stroke-width:.25;fill:none}
   .lines{stroke:var(--elf);stroke-width:.55;fill:none;opacity:.85}
-  .ring text{fill:var(--elf-40);font-family:var(--mono);font-size:2.6px;letter-spacing:.2px}
-  .ring line{stroke:var(--elf-40);stroke-width:.3}
+  .ring-coords text{fill:var(--elf-40);font-family:var(--mono);font-size:2.6px;letter-spacing:.2px}
+  .ring-coords line{stroke:var(--elf-40);stroke-width:.3}
   .bracket{stroke:var(--senf);stroke-width:.7;fill:none}
   .pt{fill:var(--elf);opacity:.9}
   .hit{fill:transparent;cursor:pointer}
@@ -70,7 +72,7 @@
   .last{fill:none;stroke:var(--elf-40);stroke-width:.35}
   .mill{stroke:var(--rot);stroke-width:1.1;opacity:.7}
   #hud{
-    margin-top:6px;border:1px solid var(--elf-15);border-left:3px solid var(--petrol);
+    position:relative;overflow:hidden;margin-top:6px;border:1px solid var(--elf-15);border-left:3px solid var(--petrol);
     padding:9px 12px;min-height:66px;line-height:1.45;background:var(--schwarz2)
   }
   #hud .row{font-size:11px;color:var(--elf-40);letter-spacing:.12em;margin-bottom:3px}
@@ -80,13 +82,57 @@
   #hud.win .msg{color:var(--senf);font-size:17px}
   #hud.win.remis .msg{color:var(--elf)}
   @keyframes blink{50%{opacity:0}}
-  .controls{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;padding:12px 2px 6px;font-size:11px;color:var(--elf-40)}
-  .controls label{display:flex;flex-direction:column;gap:4px;letter-spacing:.1em}
-  .controls select{width:100%}
-  #stats{grid-column:1/3;display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:1px solid var(--elf-15);letter-spacing:.08em}
+  [hidden]{display:none!important}
+  /* Fortschrittsleiste: Animation nur auf transform, läuft auch, während die KI rechnet */
+  #bar{position:absolute;left:0;bottom:0;height:2px;width:100%;background:var(--elf);opacity:.6;transform:scaleX(0);transform-origin:left;will-change:transform;pointer-events:none}
+  @keyframes barrun{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  #hud.win{--pc:var(--senf)} #hud.alarm{--pc:var(--rot)} #hud.remis{--pc:var(--elf)}
+  #hud.pulse{animation:hudpulse .4s 3}
+  @keyframes hudpulse{50%{border-color:var(--pc);box-shadow:0 0 0 1px var(--pc)}}
+  /* Steine: Gleiten per transform-Transition, Erscheinen, Blitz, Zerfall */
+  .stone-g{transition:transform .18s ease-out;will-change:transform}
+  .stone-g.pop .inner{animation:pop .12s ease-out}
+  @keyframes pop{from{transform:scale(.6)}to{transform:scale(1)}}
+  .flash .stone,.mill.flash{animation:flash .15s 2}
+  @keyframes flash{0%,100%{opacity:1}50%{opacity:.15}}
+  .gone .stone{animation:shrink .25s ease-in forwards}
+  .gone .core{display:none}
+  .ring{fill:none;stroke:var(--elf);stroke-width:.3;animation:ringfade .25s ease-out forwards}
+  @keyframes shrink{to{transform:scale(0)}}
+  @keyframes ringfade{to{opacity:0;transform:scale(1.5)}}
+  /* Overlays: Menü und Regeln */
+  .overlay{display:none;position:fixed;inset:0;z-index:8;background:var(--schwarz);overflow:auto;justify-content:center;align-items:flex-start;
+    padding:calc(env(safe-area-inset-top) + 16px) 12px calc(env(safe-area-inset-bottom) + 16px)}
+  .overlay.open{display:flex}
+  .panel{position:relative;width:100%;max-width:470px;padding:22px 18px 18px;border:1px solid var(--elf-15)}
+  .corner{position:absolute;width:14px;height:14px;border:0 solid var(--senf)}
+  .corner.tl{top:-1px;left:-1px;border-top-width:2px;border-left-width:2px}
+  .corner.tr{top:-1px;right:-1px;border-top-width:2px;border-right-width:2px}
+  .corner.bl{bottom:-1px;left:-1px;border-bottom-width:2px;border-left-width:2px}
+  .corner.br{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
+  .panel h1{margin:0 0 20px}
+  .modes,.actions{display:grid;gap:8px}
+  .modes{margin-bottom:16px} .actions{margin:18px 0 16px}
+  .big{min-height:56px;width:100%;font-size:15px;letter-spacing:.14em}
+  .big.on{background:var(--senf);color:var(--schwarz);border-color:var(--senf)}
+  .opt{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .lbl{font-size:11px;letter-spacing:.12em;color:var(--elf-40)}
+  .seg{display:flex}
+  .seg button{flex:1;min-height:44px;border-radius:0;margin-left:-1px}
+  .seg button:first-child{border-radius:3px 0 0 3px;margin-left:0} .seg button:last-child{border-radius:0 3px 3px 0}
+  .seg button.on{background:var(--senf);color:var(--schwarz);border-color:var(--senf);position:relative;z-index:1}
+  #stats{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--elf-15);font-size:11px;color:var(--elf-40);letter-spacing:.08em}
   #stats b{color:var(--elf);font-weight:500}
   #stats button{font-size:10px;padding:4px 8px}
-  @media (prefers-reduced-motion:reduce){#hud .msg::after{animation:none}}
+  .link{border:none;padding:12px 0 0;color:var(--elf-40);letter-spacing:.1em;text-decoration:underline;text-underline-offset:3px}
+  .phead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .phead h2{margin:0;font-weight:500;font-size:16px;letter-spacing:.3em}
+  #rules p{margin:0 0 10px;line-height:1.5;font-size:13px}
+  #rules p b{color:var(--senf);font-weight:500}
+  @media (prefers-reduced-motion:reduce){
+    #hud .msg::after,#hud.pulse,.stone-g.pop .inner,.flash .stone,.mill.flash,.gone .stone,.ring{animation:none}
+    .stone-g{transition:none} #bar{display:none}
+  }
 </style>
 </head>
 <body>
@@ -96,7 +142,7 @@
   <div class="btns">
     <button id="undoBtn" title="Rückgängig">◀ Zug</button>
     <button id="soundBtn" title="Ton">Ton an</button>
-    <button id="newBtn">Neu</button>
+    <button id="menuBtn">Menü</button>
   </div>
 </header>
 
@@ -109,7 +155,7 @@
   <svg id="board" viewBox="0 0 100 100" aria-label="Mühlebrett">
     <rect width="100" height="100" fill="#0c0a0c"/>
     <g id="grid" class="grid"></g>
-    <g id="ring" class="ring"></g>
+    <g id="ring" class="ring-coords"></g>
     <g id="brackets" class="bracket"></g>
     <g id="mills"></g>
     <g id="lines" class="lines"></g>
@@ -125,21 +171,45 @@
   <span>geschlagen <b id="capS">0</b></span>
 </div>
 
-<div id="hud"><div class="row" id="hudRow"></div><div class="msg" id="hudMsg"></div></div>
-
-<div class="controls">
-  <label>MODUS
-    <select id="modeSel"><option value="ai">Gegen Computer</option><option value="2p">Zwei Spieler</option></select>
-  </label>
-  <label>STÄRKE
-    <select id="level"><option value="1">Leicht</option><option value="2" selected>Mittel</option><option value="3">Schwer</option></select>
-  </label>
-  <label>ANFANG
-    <select id="starter"><option value="1" selected>Senf (Du)</option><option value="2">Petrol</option></select>
-  </label>
-  <label>REGELN<span style="color:var(--elf);letter-spacing:0;font-size:12px;line-height:1.4;padding-top:5px">9 Steine, Springen bei 3</span></label>
-  <div id="stats"><span>BILANZ GEGEN COMPUTER: <b id="statW">0</b> Siege | <b id="statD">0</b> Remis | <b id="statL">0</b> Niederlagen</span><button id="statReset">zurücksetzen</button></div>
+<div id="hud"><div class="row" id="hudRow"></div><div class="msg" id="hudMsg"></div><i id="bar"></i></div>
 </div>
+
+<div id="menu" class="overlay" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
+  <div class="panel">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <h1 id="menuTitle">MÜHLE<small>NAVIGATIONSRASTER 7x7</small></h1>
+    <div class="modes">
+      <button class="big" id="modeAi" aria-pressed="true">Gegen Computer</button>
+      <button class="big" id="mode2p" aria-pressed="false">Zwei Spieler</button>
+    </div>
+    <div class="opt" id="levelOpt"><span class="lbl">STÄRKE</span>
+      <div class="seg" id="levelSeg"><button data-v="1">Leicht</button><button data-v="2">Mittel</button><button data-v="3">Schwer</button></div>
+    </div>
+    <div class="opt"><span class="lbl">ANFANG</span>
+      <div class="seg" id="startSeg"><button data-v="1">Ich</button><button data-v="2">Computer</button></div>
+    </div>
+    <div class="actions">
+      <button class="big" id="resumeBtn" hidden>Weiterspielen</button>
+      <button class="big" id="newBtn">Neue Partie</button>
+    </div>
+    <div id="stats"><span>BILANZ GEGEN COMPUTER: <b id="statW">0</b> Siege | <b id="statD">0</b> Remis | <b id="statL">0</b> Niederlagen</span><button id="statReset">zurücksetzen</button></div>
+    <button class="link" id="rulesBtn">Regeln</button>
+  </div>
+</div>
+
+<div id="rules" class="overlay" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+  <div class="panel">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <div class="phead"><h2 id="rulesTitle">REGELN</h2><button id="rulesClose">Schließen</button></div>
+    <p><b>Setzphase.</b> Beide Seiten setzen abwechselnd je 9 Steine auf freie Punkte des Bretts.</p>
+    <p><b>Ziehphase.</b> Sind alle Steine gesetzt, wird ein eigener Stein entlang einer Linie auf einen freien Nachbarpunkt gezogen.</p>
+    <p><b>Springen.</b> Wer nur noch 3 Steine hat, darf mit jedem Zug auf einen beliebigen freien Punkt springen.</p>
+    <p><b>Mühle.</b> Drei eigene Steine in einer Reihe entlang einer Linie bilden eine Mühle. Wer eine Mühle schließt, nimmt einen gegnerischen Stein vom Brett.</p>
+    <p><b>Schutz.</b> Steine in einer Mühle dürfen nicht geschlagen werden. Nur wenn alle gegnerischen Steine in Mühlen stehen, darf aus einer Mühle geschlagen werden.</p>
+    <p><b>Verlust.</b> Wer nach der Setzphase weniger als 3 Steine hat oder am Zug keinen legalen Zug mehr hat, verliert.</p>
+    <p><b>Remis.</b> Erscheint dieselbe Stellung zum dritten Mal oder vergehen in der Ziehphase 50 Züge ohne Schlag, endet die Partie unentschieden.</p>
+    <p><b>Bedienung.</b> Stein antippen, dann den Zielpunkt. Kreuze zeigen mögliche Ziele, rote Ringe schlagbare Steine. „◀ Zug“ nimmt den letzten Zug zurück.</p>
+  </div>
 </div>
 
 <script>
@@ -296,7 +366,7 @@ function bestMove(s,me,level,hist){
   return best;
 }
 
-/* ---------- Ton ---------- */
+/* ---------- Ton und Vibration ---------- */
 let audio=null, soundOn=true;
 function tone(freq,dur,type,gain){
   if(!soundOn) return;
@@ -309,14 +379,15 @@ function tone(freq,dur,type,gain){
     o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t+dur+0.02);
   }catch(e){}
 }
+function buzz(pattern){ if(!soundOn||!navigator.vibrate) return; try{ navigator.vibrate(pattern); }catch(e){} } // Vibration folgt der Ton-Einstellung
 const SFX={
-  place:()=>tone(660,0.09,'triangle'),
-  move:()=>{tone(520,0.06,'triangle');setTimeout(()=>tone(700,0.07,'triangle'),60);},
-  mill:()=>{tone(440,0.12,'square',0.05);setTimeout(()=>tone(660,0.16,'square',0.05),120);},
-  take:()=>tone(160,0.22,'sawtooth',0.06),
-  win:()=>[440,554,659,880].forEach((f,i)=>setTimeout(()=>tone(f,0.18,'triangle'),i*110)),
-  lose:()=>[330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'sawtooth',0.05),i*160)),
-  draw:()=>{tone(494,0.14,'triangle',0.06);setTimeout(()=>tone(494,0.14,'triangle',0.06),200);},
+  place:()=>{ tone(660,0.09,'triangle'); buzz(10); },
+  move:()=>{ tone(520,0.06,'triangle'); setTimeout(()=>tone(700,0.07,'triangle'),60); buzz(10); },
+  mill:()=>{ tone(440,0.12,'square',0.05); setTimeout(()=>tone(660,0.16,'square',0.05),120); buzz([30,40,30]); },
+  take:()=>{ tone(160,0.22,'sawtooth',0.06); buzz(60); },
+  win:()=>{ [440,554,659,880].forEach((f,i)=>setTimeout(()=>tone(f,0.18,'triangle'),i*110)); buzz([40,60,40,60]); },
+  lose:()=>{ [330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'sawtooth',0.05),i*160)); buzz(120); },
+  draw:()=>{ tone(494,0.14,'triangle',0.06); setTimeout(()=>tone(494,0.14,'triangle',0.06),200); buzz([30,30]); },
 };
 
 /* ---------- Speicher ---------- */
@@ -325,14 +396,20 @@ const store={
   set(k,v){ try{ localStorage.setItem('muehle:'+k,JSON.stringify(v)); }catch(e){} }
 };
 let stats=store.get('stats',{w:0,d:0,l:0}); stats.d=stats.d||0;
+const settings={mode:'ai',level:'2',starter:'1'}; // mode: 'ai' | '2p'; level: '1'..'3'; starter: '1' Senf/Ich, '2' Petrol/Computer
+function saveSettings(){ store.set('settings',{mode:settings.mode,level:settings.level,starter:settings.starter,sound:soundOn}); }
 
 /* ---------- UI ---------- */
 const $=id=>document.getElementById(id);
 const STEP=12.2, OFF=13.4;
 const xy=i=>[OFF+POS[i][0]*STEP,OFF+POS[i][1]*STEP];
-let S, mode, selected=-1, lastTo=-1, over=false, thinking=false, cap=[0,0,0], history=[], moveNo=0, twoPlayer=false, reps=new Map();
+let S, mode, selected=-1, lastTo=-1, over=false, thinking=false, cap=[0,0,0], history=[], moveNo=0, twoPlayer=false, reps=new Map(), started=false;
+let stoneEls={}, flashMill=null; // stoneEls: Feldindex -> <g> des Steins; flashMill: Felder der gerade geschlossenen Mühle
 const isHumanTurn=()=>twoPlayer||S.turn===P1;
 const nameOf=p=>p===P1?(twoPlayer?'SENF':'DU'):(twoPlayer?'PETROL':'COMPUTER');
+const reduceMotion=()=>!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const restartClass=(el,cls)=>{ el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); };
+const millCells=(b,i,p)=>[...new Set(MILLS_AT[i].filter(m=>m.every(j=>b[j]===p)).flat())];
 
 (function drawBoard(){
   const G=$('grid'), R=$('ring'), B=$('brackets'), L=$('lines'), P=$('pts'), H=$('hits');
@@ -359,14 +436,49 @@ const nameOf=p=>p===P1?(twoPlayer?'SENF':'DU'):(twoPlayer?'PETROL':'COMPUTER');
   H.addEventListener('click',e=>{ const i=e.target.dataset.i; if(i!==undefined) onTap(+i); });
 })();
 
-function render(){
-  const St=$('stones'), M=$('marks'), Ml=$('mills'); St.innerHTML=''; M.innerHTML=''; Ml.innerHTML='';
-  for(const m of MILLS){ const p=S.b[m[0]]; if(p&&S.b[m[1]]===p&&S.b[m[2]]===p){ const [x1,y1]=xy(m[0]),[x2,y2]=xy(m[2]); Ml.insertAdjacentHTML('beforeend',`<line class="mill" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`); } }
-  for(let i=0;i<24;i++){ const v=S.b[i]; if(!v) continue; const [x,y]=xy(i);
-    St.insertAdjacentHTML('beforeend',`<circle class="stone ${v===P1?'s':'p'}" cx="${x}" cy="${y}" r="4"/><circle class="core" cx="${x}" cy="${y}" r="1.1"/>`);
+/* Steine: Elemente werden je Feld wiederverwendet; Ziehen verschiebt nur das Element (CSS-Transition) */
+function makeStone(i,p,pop){
+  const [x,y]=xy(i), g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('class','stone-g'+(pop?' pop':'')); g.dataset.p=p;
+  g.style.transform=`translate(${x}px,${y}px)`;
+  g.innerHTML=`<g class="inner"><circle class="stone ${p===P1?'s':'p'}" r="4"/><circle class="core" r="1.1"/></g>`;
+  return g;
+}
+function moveStone(g,i){ const [x,y]=xy(i); g.style.transform=`translate(${x}px,${y}px)`; }
+function dissolveStone(g){
+  if(reduceMotion()){ g.remove(); return; }
+  g.classList.add('gone'); g.querySelector('.inner').insertAdjacentHTML('beforeend','<circle class="ring" r="4"/>');
+  setTimeout(()=>g.remove(),260);
+}
+function renderStones(reset){
+  const St=$('stones'), b=S.b;
+  if(reset){ St.innerHTML=''; stoneEls={}; for(let i=0;i<24;i++) if(b[i]) St.appendChild(stoneEls[i]=makeStone(i,b[i],false)); return; }
+  const gone=[], appeared=[];
+  for(let i=0;i<24;i++){
+    const el=stoneEls[i], p=el?+el.dataset.p:0;
+    if(el&&b[i]!==p) gone.push({i,el,p});
+    if(b[i]&&b[i]!==p) appeared.push(i);
   }
+  for(const p of [P1,P2]){
+    const g=gone.filter(x=>x.p===p), a=appeared.filter(i=>b[i]===p);
+    if(g.length===1&&a.length===1){ delete stoneEls[g[0].i]; stoneEls[a[0]]=g[0].el; moveStone(g[0].el,a[0]); } // Ziehen oder Springen
+    else {
+      for(const x of g){ if(stoneEls[x.i]===x.el) delete stoneEls[x.i]; dissolveStone(x.el); }              // geschlagen
+      for(const i of a) St.appendChild(stoneEls[i]=makeStone(i,p,true));                                      // gesetzt
+    }
+  }
+  if(flashMill) for(const i of flashMill) if(stoneEls[i]) restartClass(stoneEls[i],'flash');
+}
+
+function render(opts){
+  const M=$('marks'), Ml=$('mills'); M.innerHTML=''; Ml.innerHTML='';
+  const fm=flashMill?new Set(flashMill):null;
+  for(const m of MILLS){ const p=S.b[m[0]]; if(p&&S.b[m[1]]===p&&S.b[m[2]]===p){ const [x1,y1]=xy(m[0]),[x2,y2]=xy(m[2]);
+    Ml.insertAdjacentHTML('beforeend',`<line class="mill${fm&&m.every(i=>fm.has(i))?' flash':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`); } }
+  renderStones(!!(opts&&opts.reset));
+  flashMill=null;
   if(lastTo>=0){ const [x,y]=xy(lastTo); M.insertAdjacentHTML('beforeend',`<rect class="last" x="${x-5.2}" y="${y-5.2}" width="10.4" height="10.4"/>`); }
-  if(!over&&!thinking&&isHumanTurn()){
+  if(started&&!over&&!thinking&&isHumanTurn()){
     const p=S.turn, gc=p===P1?'go':'go2';
     if(mode==='remove'){ for(const r of removable(S.b,3-p)){ const [x,y]=xy(r); M.insertAdjacentHTML('beforeend',`<circle class="take" cx="${x}" cy="${y}" r="5.4"/>`); } }
     else {
@@ -391,6 +503,9 @@ function hud(msg,cls){
   $('hudRow').textContent=row;
   $('hudMsg').textContent=msg; $('hud').className=cls||'';
 }
+function pulseHud(){ restartClass($('hud'),'pulse'); }
+function barStart(ms){ const b=$('bar'); b.style.animation='none'; void b.offsetWidth; b.style.animation=`barrun ${ms}ms linear forwards`; }
+function barStop(){ $('bar').style.animation='none'; }
 function statusForHuman(){
   const p=S.turn, who=twoPlayer?(p===P1?'Senf':'Petrol'):'Du';
   if(mode==='remove') return hud(`Mühle! ${who===  'Du'?'Tipp':who+', tipp'} auf einen gegnerischen Stein.`,'alarm');
@@ -402,7 +517,7 @@ function statusForHuman(){
 function snapshot(){ history.push({S:clone(S),cap:cap.slice(),lastTo,moveNo,reps:new Map(reps)}); if(history.length>60) history.shift(); }
 
 function onTap(i){
-  if(over||thinking||!isHumanTurn()) return;
+  if(!started||over||thinking||!isHumanTurn()) return;
   const p=S.turn, b=S.b;
   if(mode==='remove'){
     if(removable(b,3-p).includes(i)){ b[i]=0; cap[p]++; S.nc=0; mode='play'; SFX.take(); endTurn(); }
@@ -420,7 +535,7 @@ function onTap(i){
 }
 function afterMove(i){
   const p=S.turn; moveNo++;
-  if(inMill(S.b,i,p)&&count(S.b,3-p)>0){ mode='remove'; SFX.mill(); render(); statusForHuman(); }
+  if(inMill(S.b,i,p)&&count(S.b,3-p)>0){ mode='remove'; flashMill=millCells(S.b,i,p); SFX.mill(); render(); statusForHuman(); }
   else endTurn();
 }
 // Stellung eintragen, dann Verlust und Remis prüfen. Liefert true, wenn die Partie zu Ende ist.
@@ -438,53 +553,91 @@ function endTurn(){
 }
 function aiTurn(){
   thinking=true; hud('Computer berechnet Zug …'); render();
+  const level=+settings.level;
+  barStart(380+(level===3?LEVELS[3].budget:0));
   setTimeout(()=>{
-    const m=bestMove(S,P2,+$('level').value,reps);
-    S=apply(S,m,P2); lastTo=m.to; moveNo++;
-    if(m.remove>=0){ cap[P2]++; SFX.take(); } else if(m.from<0) SFX.place(); else SFX.move();
-    thinking=false; render();
-    if(recordAndCheck(P2)) return;
-    statusForHuman();
+    const m=bestMove(S,P2,level,reps), full=apply(S,m,P2);
+    lastTo=m.to; moveNo++;
+    const done=()=>{ barStop(); thinking=false; render(); if(recordAndCheck(P2)) return; statusForHuman(); };
+    if(m.remove>=0){ // erst ziehen und Mühle blitzen, dann schlagen
+      S=apply(S,{from:m.from,to:m.to,remove:-1},P2); flashMill=millCells(S.b,m.to,P2); render(); SFX.mill();
+      setTimeout(()=>{ S=full; cap[P2]++; render(); SFX.take(); done(); },320);
+    } else { S=full; render(); if(m.from<0) SFX.place(); else SFX.move(); done(); }
   },380);
 }
 function finish(winner){
   over=true; render();
-  if(twoPlayer){ hud(`${winner===P1?'Senf':'Petrol'} hat gewonnen.`,'win'); SFX.win(); return; }
+  if(twoPlayer){ hud(`${winner===P1?'Senf':'Petrol'} hat gewonnen.`,'win'); SFX.win(); pulseHud(); return; }
   if(winner===P1){ stats.w++; hud('Du hast gewonnen.','win'); SFX.win(); }
   else { stats.l++; hud('Der Computer hat gewonnen.','alarm'); SFX.lose(); }
-  store.set('stats',stats); render();
+  pulseHud(); store.set('stats',stats); render();
 }
 function finishDraw(reason){
   over=true; render();
-  hud(reason==='rep'?'Remis - Stellung dreimal wiederholt.':'Remis - 50 Züge ohne Schlag.','win remis'); SFX.draw();
+  hud(reason==='rep'?'Remis - Stellung dreimal wiederholt.':'Remis - 50 Züge ohne Schlag.','win remis'); SFX.draw(); pulseHud();
   if(twoPlayer) return;
   stats.d++; store.set('stats',stats); render();
 }
 function undo(){
   if(!history.length||over||thinking) return;
   const h=history.pop(); S=h.S; cap=h.cap; lastTo=h.lastTo; moveNo=h.moveNo; reps=h.reps;
-  mode='play'; selected=-1; render(); statusForHuman();
+  mode='play'; selected=-1; flashMill=null; render({reset:true}); statusForHuman();
 }
 function newGame(){
-  twoPlayer=$('modeSel').value==='2p';
-  S=newState(+$('starter').value); mode='play'; selected=-1; lastTo=-1; over=false; thinking=false; cap=[0,0,0]; history=[]; moveNo=0; reps=new Map();
-  reps.set(posKey(S),1);
-  store.set('settings',{mode:$('modeSel').value,level:$('level').value,starter:$('starter').value,sound:soundOn});
-  render();
+  twoPlayer=settings.mode==='2p';
+  S=newState(+settings.starter); mode='play'; selected=-1; lastTo=-1; over=false; thinking=false; cap=[0,0,0]; history=[]; moveNo=0; reps=new Map(); started=true;
+  reps.set(posKey(S),1); flashMill=null; barStop();
+  saveSettings();
+  render({reset:true});
   if(!twoPlayer&&S.turn===P2) aiTurn(); else statusForHuman();
 }
+
+/* Menü und Regeln */
+function updateMenu(){
+  const ai=settings.mode==='ai';
+  $('modeAi').classList.toggle('on',ai); $('modeAi').setAttribute('aria-pressed',ai);
+  $('mode2p').classList.toggle('on',!ai); $('mode2p').setAttribute('aria-pressed',!ai);
+  $('levelOpt').hidden=!ai;
+  for(const b of $('levelSeg').children){ const on=b.dataset.v===settings.level; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }
+  const sb=$('startSeg').children; sb[0].textContent=ai?'Ich':'Senf'; sb[1].textContent=ai?'Computer':'Petrol';
+  for(const b of sb){ const on=b.dataset.v===settings.starter; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }
+  $('resumeBtn').hidden=!(started&&!over);
+  $('statW').textContent=stats.w; $('statD').textContent=stats.d; $('statL').textContent=stats.l;
+}
+function openMenu(){ updateMenu(); $('menu').classList.add('open'); ($('resumeBtn').hidden?$('modeAi'):$('resumeBtn')).focus(); }
+function closeMenu(){ $('menu').classList.remove('open'); }
+function openRules(){ $('rules').classList.add('open'); $('rulesClose').focus(); }
+function closeRules(){ $('rules').classList.remove('open'); $('rulesBtn').focus(); }
+
 (function init(){
   const st=store.get('settings',null);
-  if(st){ $('modeSel').value=st.mode||'ai'; $('level').value=st.level||'2'; $('starter').value=st.starter||'1'; soundOn=st.sound!==false; }
+  if(st){
+    settings.mode=st.mode==='2p'?'2p':'ai';
+    settings.level=['1','2','3'].includes(String(st.level))?String(st.level):'2';
+    settings.starter=String(st.starter)==='2'?'2':'1';
+    soundOn=st.sound!==false;
+  }
   $('soundBtn').textContent=soundOn?'Ton an':'Ton aus';
-  $('newBtn').addEventListener('click',newGame);
+  $('menuBtn').addEventListener('click',openMenu);
+  $('newBtn').addEventListener('click',()=>{ newGame(); closeMenu(); });
+  $('resumeBtn').addEventListener('click',closeMenu);
   $('undoBtn').addEventListener('click',undo);
-  $('modeSel').addEventListener('change',newGame);
-  $('starter').addEventListener('change',newGame);
-  $('level').addEventListener('change',()=>store.set('settings',{mode:$('modeSel').value,level:$('level').value,starter:$('starter').value,sound:soundOn}));
-  $('soundBtn').addEventListener('click',()=>{ soundOn=!soundOn; $('soundBtn').textContent=soundOn?'Ton an':'Ton aus'; if(soundOn) tone(660,0.08,'triangle'); store.set('settings',{mode:$('modeSel').value,level:$('level').value,starter:$('starter').value,sound:soundOn}); });
-  $('statReset').addEventListener('click',()=>{ stats={w:0,d:0,l:0}; store.set('stats',stats); render(); });
-  newGame();
+  $('modeAi').addEventListener('click',()=>{ settings.mode='ai'; saveSettings(); updateMenu(); });
+  $('mode2p').addEventListener('click',()=>{ settings.mode='2p'; saveSettings(); updateMenu(); });
+  $('levelSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.level=v; saveSettings(); updateMenu(); } }); // Stärke wirkt sofort, auch in der laufenden Partie
+  $('startSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.starter=v; saveSettings(); updateMenu(); } });
+  $('soundBtn').addEventListener('click',()=>{ soundOn=!soundOn; $('soundBtn').textContent=soundOn?'Ton an':'Ton aus'; if(soundOn) tone(660,0.08,'triangle'); saveSettings(); });
+  $('statReset').addEventListener('click',()=>{ stats={w:0,d:0,l:0}; store.set('stats',stats); updateMenu(); });
+  $('rulesBtn').addEventListener('click',openRules);
+  $('rulesClose').addEventListener('click',closeRules);
+  document.addEventListener('keydown',e=>{
+    if(e.key!=='Escape') return;
+    if($('rules').classList.contains('open')) closeRules();
+    else if($('menu').classList.contains('open')&&started&&!over) closeMenu();
+  });
+  twoPlayer=settings.mode==='2p'; S=newState(+settings.starter);
+  render({reset:true}); hud('Neue Partie im Menü starten.');
+  openMenu();
   if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
 })();
 </script>

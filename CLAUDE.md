@@ -13,11 +13,11 @@ Live: https://floriananalytics.github.io/muehle/
 - Eine Datei: `index.html` (Regeln, KI, Oberfläche, Ton, Speicherung). Kein Build-Schritt, keine Abhängigkeiten.
 - `manifest.json`, `sw.js` (Service Worker, Cache-first mit Netz-Update), Icons `icon-192.png`, `icon-512.png`, `icon-512-maskable.png`.
 - Alle Pfade relativ (`./`), weil die App unter `/muehle/` liegt, nicht im Root.
-- Speicherung nur in `localStorage` unter dem Präfix `muehle:` (settings, stats). Keine Server, kein Tracking.
+- Speicherung nur in `localStorage` unter dem Präfix `muehle:` (settings: mode/level/starter/sound, stats: w/d/l). Keine Server, kein Tracking.
 
 ## Pflicht bei jeder Änderung
 - In `sw.js` die Konstante `CACHE` hochzählen (`muehle-v1` -> `muehle-v2` ...), sonst behalten installierte Geräte die alte Version.
-- `index.html` nach Änderungen syntaktisch prüfen (z. B. Skriptblock mit Node laden) und eine Partie KI gegen KI simulieren.
+- `index.html` nach Änderungen syntaktisch prüfen (z. B. Skriptblock mit Node laden) und eine Partie KI gegen KI simulieren. Für Node-Prüfungen den Skriptblock bis zum Kommentar `/* ---------- Ton` laden (davor stehen nur Brett, Spiellogik und KI ohne DOM-Zugriff).
 - Direkt auf `main` committen, deutsche Commit-Nachricht.
 
 ## Spielregeln (fest)
@@ -52,13 +52,21 @@ Live: https://floriananalytics.github.io/muehle/
 - Monospace-Schrift für alles, Koordinatenring A-G / 1-7, Eckklammern in Senf, Scanlinien-Overlay.
 - Bewegung sparsam: nur als Antwort auf Aktionen (Zug, Mühle, Schlag), `prefers-reduced-motion` respektieren.
 - Touch-Ziele mindestens 44 px; Hit-Kreise im SVG bleiben groß (r=6 im 100er-Viewbox).
+- Startmenü (`#menu`, Overlay im Bordcomputer-Stil): Titel, große Schaltflächen "Gegen Computer" | "Zwei Spieler" (Modus, gewählter in Senf), Segmente Stärke (nur bei Computer) und Anfang ("Ich" | "Computer" bzw. "Senf" | "Petrol"), "Weiterspielen" (nur bei laufender Partie) und "Neue Partie", Bilanz mit "zurücksetzen", Link "Regeln". Modus und Anfang wirken erst bei "Neue Partie", Stärke sofort. Header im Spiel: "◀ Zug", "Ton an/aus", "Menü". Escape schließt Regeln bzw. das Menü (nur bei laufender Partie). Unter dem Brett steht nur das HUD.
+- Regel-Overlay (`#rules`): gleicher Stil, 8 kurze Absätze, "Schließen" oben rechts.
+- Animationen, nur als Antwort auf Aktionen; `prefers-reduced-motion: reduce` schaltet alle ab (CSS) und entfernt geschlagene Steine sofort (JS `reduceMotion()`):
+  - Steine sind `<g class="stone-g">` mit `style.transform=translate(x px, y px)`; `render()` verwendet Elemente je Feld wieder (`stoneEls`), Ziehen verschiebt nur das Element (Transition 180 ms ease-out), Setzen skaliert 0,6 -> 1 (120 ms, Klasse `pop`), Schlagen zerfällt (250 ms, Klasse `gone` + Elfenbein-Ring), Mühle blitzt zweimal 150 ms (Klasse `flash` auf Steinen und Mühlenlinie, `flashMill`). Rückgängig und Neustart rendern ohne Animation (`render({reset:true})`).
+  - Computerzug mit Schlag: erst Zug und Mühle-Blitz, 320 ms später der Schlag; `thinking` bleibt solange gesetzt.
+  - Sieg/Niederlage/Remis: HUD-Rand pulsiert dreimal (Klasse `pulse`, Farbe über `--pc`).
+  - Fortschrittsleiste `#bar` im HUD während der Computer rechnet: Animation nur auf `transform` (läuft auf dem Compositor, obwohl die KI den Hauptthread blockiert), Dauer 380 ms plus Zeitbudget bei Schwer.
+- Vibration (`buzz`, `navigator.vibrate`, stumm ignoriert wenn nicht vorhanden): Setzen/Ziehen 10, Mühle 30-40-30, Schlagen 60, Sieg 40-60-40-60, Niederlage 120, Remis 30-30. Folgt der Ton-Einstellung.
 
 ## Umgesetzt
 - Remisregeln, Remis-Spalte in der Bilanz, KI-Malus für Stellungswiederholung (Änderungsauftrag 1).
 - Stärkestufen spürbar getrennt (Änderungsauftrag 1).
+- Startmenü, Animationen (Gleiten, Mühle-Blitz, Zerfall beim Schlag), Vibration, Regel-Overlay (Änderungsauftrag 2).
 
 ## Offene Punkte (Reihenfolge)
-1. Startmenü, Animationen (Gleiten, Mühle-Blitz, Zerfall beim Schlag), Vibration.
-2. Regelerklärung als Overlay, Zugvorschlag.
-3. Weitere Spiele im selben Rahmen (Dame, Vier gewinnt) - Engine-Struktur wiederverwenden.
+1. Zugvorschlag (Regelerklärung als Overlay ist mit Auftrag 2 umgesetzt).
+2. Weitere Spiele im selben Rahmen (Dame, Vier gewinnt) - Engine-Struktur wiederverwenden.
 - Online-Spiel ist ohne Server nicht vorgesehen.
