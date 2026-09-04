@@ -213,15 +213,17 @@ const CSS=`
 .muehle .ring{fill:none;stroke:var(--elf);stroke-width:.3;animation:mh-ringfade .25s ease-out forwards}
 @keyframes mh-shrink{to{transform:scale(0)}}
 @keyframes mh-ringfade{to{opacity:0;transform:scale(1.5)}}
+  .muehle .hint .go,.muehle .hint .go2,.muehle .hint .take{animation:mh-blink .7s steps(1) infinite}
+@keyframes mh-blink{50%{opacity:0}}
 @media (prefers-reduced-motion:reduce){
-  .muehle .stone-g.pop .inner,.muehle .flash .stone,.muehle .mill.flash,.muehle .gone .stone,.muehle .ring{animation:none}
+  .muehle .stone-g.pop .inner,.muehle .flash .stone,.muehle .mill.flash,.muehle .gone .stone,.muehle .ring,.muehle .hint *{animation:none}
   .muehle .stone-g{transition:none}
 }`;
 const STEP=12.2, OFF=13.4;
 const xy=i=>[OFF+POS[i][0]*STEP,OFF+POS[i][1]*STEP];
 let H=null, root=null, styleEl=null, gen=0; // H = Hooks der Hülle, gen = Generation gegen verspätete Timer
 let S, mode, selected=-1, lastTo=-1, over=false, thinking=false, cap=[0,0,0], history=[], moveNo=0, twoPlayer=false, reps=new Map(), started=false, level=2;
-let stoneEls={}, flashMill=null; // stoneEls: Feldindex -> <g> des Steins; flashMill: Felder der gerade geschlossenen Mühle
+let stoneEls={}, flashMill=null, hinting=false; // stoneEls: Feldindex -> <g> des Steins; flashMill: Felder der gerade geschlossenen Mühle
 const q=id=>root.querySelector('#'+id);
 const isHumanTurn=()=>twoPlayer||S.turn===P1;
 const farbe=p=>META.farben[p-1].name;
@@ -295,7 +297,7 @@ function render(opts){
   renderStones(!!(opts&&opts.reset));
   flashMill=null;
   if(lastTo>=0){ const [x,y]=xy(lastTo); M.insertAdjacentHTML('beforeend',`<rect class="last" x="${x-5.2}" y="${y-5.2}" width="10.4" height="10.4"/>`); }
-  if(started&&!over&&!thinking&&isHumanTurn()){
+  if(started&&!over&&!thinking&&!hinting&&isHumanTurn()){
     const p=S.turn, gc=p===P1?'go':'go2';
     if(mode==='remove'){ for(const r of removable(S.b,3-p)){ const [x,y]=xy(r); M.insertAdjacentHTML('beforeend',`<circle class="take" cx="${x}" cy="${y}" r="5.4"/>`); } }
     else {
@@ -328,7 +330,8 @@ function statusForHuman(){
 function snapshot(){ history.push({S:clone(S),cap:cap.slice(),lastTo,moveNo,reps:new Map(reps)}); if(history.length>60) history.shift(); }
 
 function onTap(i){
-  if(!started||over||thinking||!isHumanTurn()) return;
+  clearHint();
+  if(!started||over||thinking||hinting||!isHumanTurn()) return;
   const p=S.turn, b=S.b;
   if(mode==='remove'){
     if(removable(b,3-p).includes(i)){ b[i]=0; cap[p]++; S.nc=0; mode='play'; H.sfx.take(); endTurn(); }
@@ -388,7 +391,7 @@ function mount(container,hooks){
 <div class="wrap"><svg viewBox="0 0 100 100" aria-label="Mühlebrett">
   <rect width="100" height="100" fill="#0c0a0c"/>
   <g id="grid" class="grid"></g><g id="ring" class="ring-coords"></g><g id="brackets" class="bracket"></g>
-  <g id="mills"></g><g id="lines" class="lines"></g><g id="pts"></g><g id="marks"></g><g id="stones"></g><g id="hits"></g>
+  <g id="mills"></g><g id="lines" class="lines"></g><g id="pts"></g><g id="marks"></g><g id="stones"></g><g id="hint" class="hint"></g><g id="hits"></g>
 </svg></div>
 <div class="tray"><span><span class="who s" id="nameS">DU</span>Vorrat <span class="stones" id="handS"></span></span><span>geschlagen <b id="capS">0</b></span></div>`;
   drawBoard();
@@ -398,16 +401,51 @@ function mount(container,hooks){
 function newGame(opts){
   gen++; twoPlayer=!!opts.twoPlayer; level=opts.level||2;
   S=newState(opts.starter===2?P2:P1); mode='play'; selected=-1; lastTo=-1; over=false; thinking=false; cap=[0,0,0]; history=[]; moveNo=0; reps=new Map(); started=true;
-  reps.set(posKey(S),1); flashMill=null; H.progress(0);
+  reps.set(posKey(S),1); flashMill=null; hinting=false; H.progress(0); clearHint();
   render({reset:true});
   if(!twoPlayer&&S.turn===P2) aiTurn(); else statusForHuman();
 }
 function undo(){
   if(!canUndo()) return;
   const h=history.pop(); S=h.S; cap=h.cap; lastTo=h.lastTo; moveNo=h.moveNo; reps=h.reps;
-  mode='play'; selected=-1; flashMill=null; render({reset:true}); statusForHuman();
+  mode='play'; selected=-1; flashMill=null; clearHint(); render({reset:true}); statusForHuman();
 }
-function canUndo(){ return started&&!over&&!thinking&&history.length>0; }
+function canUndo(){ return started&&!over&&!thinking&&!hinting&&history.length>0; }
+/* Zugvorschlag: Stufe Schwer mit 1500 ms für den Menschen; im Schlagmodus wird der beste zu schlagende Stein gesucht */
+function canHint(){ return started&&!over&&!thinking&&!hinting&&!twoPlayer&&isHumanTurn(); }
+function bestRemoval(){
+  const me=S.turn, opp=3-me, rem=removable(S.b,opp);
+  if(rem.length===1) return {from:-1,to:-1,remove:rem[0]};
+  K.me=me; K.level=3; K.hist=reps; K.tt=new Map(); K.path=new Map(); K.repAdj=0;
+  deadline=Date.now()+LEVELS[3].budget; nodes=0;
+  let best=rem[0];
+  try{
+    for(let d=1;d<=LEVELS[3].depth;d++){ K.path.clear();
+      const scored=rem.map(r=>{ const s2=clone(S); s2.b[r]=0; s2.nc=0; s2.turn=opp; return {r,v:search(s2,opp,d,-Infinity,Infinity)}; });
+      scored.sort((a,b)=>b.v-a.v); best=scored[0].r; }
+  }catch(e){}
+  return {from:-1,to:-1,remove:best};
+}
+function hint(cb){
+  if(!canHint()){ cb(null); return; }
+  hinting=true; const g=gen; render();
+  setTimeout(()=>{
+    if(g!==gen) return;
+    const old=LEVELS[3].budget; LEVELS[3].budget=1500; let m=null;
+    try{ m=mode==='remove'?bestRemoval():bestMove(S,S.turn,3,reps); } finally{ LEVELS[3].budget=old; }
+    hinting=false; render(); cb(m);
+  },30);
+}
+function showHint(m){
+  clearHint(); if(!m) return;
+  const Hn=q('hint'), gc=S.turn===P1?'go':'go2';
+  const cross=(i,cls,r)=>{ const [x,y]=xy(i); Hn.insertAdjacentHTML('beforeend',`<path class="${cls}" d="M${x-r} ${y-r}L${x+r} ${y+r}M${x-r} ${y+r}L${x+r} ${y-r}"/>`); };
+  if(m.from>=0) cross(m.from,gc,2.2);
+  if(m.to>=0) cross(m.to,gc,2.2);
+  if(m.remove>=0) cross(m.remove,'take',2.6);
+  statusForHuman();
+}
+function clearHint(){ if(root) q('hint').innerHTML=''; }
 function setLevel(l){ level=l; }
 function destroy(){
   gen++; H&&H.progress(0);
@@ -415,8 +453,8 @@ function destroy(){
   if(root){ root.innerHTML=''; root.classList.remove('muehle'); root=null; }
   stoneEls={}; started=false; H=null;
 }
-const api={meta:META,mount,newGame,undo,canUndo,setLevel,destroy,
-  debug(){ return {S,mode,selected,lastTo,over,thinking,cap,history,moveNo,reps,stoneEls,xy,twoPlayer,started}; }};
+const api={meta:META,mount,newGame,undo,canUndo,setLevel,destroy,canHint,hint,showHint,clearHint,
+  debug(){ return {S,mode,selected,lastTo,over,thinking,hinting,cap,history,moveNo,reps,stoneEls,xy,twoPlayer,started}; }};
 if(typeof window!=='undefined'){ window.GAMES=window.GAMES||{}; window.GAMES.muehle=api; }
 if(typeof module!=='undefined'&&module.exports) module.exports={POS,ADJ,MILLS,MILLS_AT,P1,P2,newState,clone,posKey,count,inMill,removable,phase,genMoves,apply,isLoss,drawReason,LEVELS,doubleMills,evaluate,orderMoves,search,bestMove,K,meta:META};
 })();

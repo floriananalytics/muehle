@@ -220,11 +220,14 @@ const CSS=`
 .dame .ring{fill:none;stroke:var(--elf);stroke-width:.3;animation:dm-ringfade .25s ease-out forwards}
 @keyframes dm-shrink{to{transform:scale(0)}}
 @keyframes dm-ringfade{to{opacity:0;transform:scale(1.5)}}
-@media (prefers-reduced-motion:reduce){ .dame .stone-g{transition:none} .dame .flash .stone,.dame .flash .king,.dame .gone .stone,.dame .ring{animation:none} }`;
+.dame .hint .go,.dame .hint .go2,.dame .hint text{animation:dm-blink .7s steps(1) infinite}
+.dame .hint text{fill:var(--elf);font-family:var(--mono);font-size:2.6px}
+@keyframes dm-blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){ .dame .stone-g{transition:none} .dame .flash .stone,.dame .flash .king,.dame .gone .stone,.dame .ring,.dame .hint *{animation:none} }`;
 const OFF=13.4, CELL=9.6;
 let H=null, root=null, styleEl=null, gen=0, worker=null, workerId=0;
 let S, over=false, thinking=false, busy=false, history=[], twoPlayer=false, started=false, level=2, humanSide=P1, flip=false;
-let sel=-1, pend=null, lastTo=-1, moveNo=0, reps=new Map(), stoneEls={};
+let sel=-1, pend=null, lastTo=-1, moveNo=0, reps=new Map(), stoneEls={}, hinting=false;
 const q=id=>root.querySelector('#'+id);
 const farbe=p=>META.farben[p-1].name;
 const isHumanTurn=()=>twoPlayer||S.turn===humanSide;
@@ -274,7 +277,7 @@ function renderStones(reset){
 function renderMarks(){
   const M=q('marks'); M.innerHTML='';
   if(lastTo>=0&&!pend){ const [x,y]=xy(lastTo); M.insertAdjacentHTML('beforeend',`<rect class="last" x="${x-CELL/2+.4}" y="${y-CELL/2+.4}" width="${CELL-.8}" height="${CELL-.8}"/>`); }
-  if(!(started&&!over&&!thinking&&isHumanTurn())) return;
+  if(!(started&&!over&&!thinking&&!hinting&&isHumanTurn())) return;
   const p=S.turn, gc=p===P1?'go':'go2';
   const cross=t=>{ const [x,y]=xy(t); M.insertAdjacentHTML('beforeend',`<path class="${gc}" d="M${x-1.6} ${y}H${x+1.6}M${x} ${y-1.6}V${y+1.6}"/>`); };
   if(pend){ const k=pend.path.length, cur=pend.path[k-1], [x,y]=xy(cur);
@@ -307,7 +310,8 @@ function statusForHuman(){
 function snapshot(){ history.push({S:clone(S),lastTo,moveNo,reps:new Map(reps)}); if(history.length>60) history.shift(); }
 
 function onTap(i){
-  if(!started||over||thinking||busy||!isHumanTurn()) return;
+  clearHint();
+  if(!started||over||thinking||busy||hinting||!isHumanTurn()) return;
   const p=S.turn;
   if(pend){ const k=pend.path.length, next=pend.moves.filter(m=>m.path[k]===i); if(next.length) stepTo(i,next); return; }
   const legal=genMoves(S,p);
@@ -341,17 +345,17 @@ function finishMove(m){
 }
 function recordAndCheck(mover){
   const k=posKey(S); reps.set(k,(reps.get(k)||0)+1);
-  if(isLoss(S,S.turn)){ over=true; render(); H.onEnd({win:mover}); return true; }
+  if(isLoss(S,S.turn)){ over=true; render(); H.onEnd({win:mover,human:humanSide}); return true; }
   const d=drawReason(S,reps); if(d){ over=true; render(); H.onEnd({draw:true,grund:d==='rep'?'Stellung dreimal wiederholt.':'30 Züge ohne Schlag.'}); return true; }
   return false;
 }
-function askWorker(lv){
+function askWorker(lv,me,budget){
   return new Promise((resolve,reject)=>{
     try{
       if(!worker){ worker=new Worker('./games/dame.js'); worker.onerror=e=>{ const w=worker; worker=null; if(w) w.terminate(); reject(e); }; }
       const id=++workerId, w=worker;
       w.onmessage=e=>{ if(e.data.id===id) resolve(e.data.move); };
-      w.postMessage({b:S.b,turn:S.turn,nc:S.nc,me:S.turn,level:lv,budget:LEVELS[3].budget,hist:[...reps],id});
+      w.postMessage({b:S.b,turn:S.turn,nc:S.nc,me,level:lv,budget:budget||LEVELS[3].budget,hist:[...reps],id});
     }catch(e){ reject(e); }
   });
 }
@@ -376,7 +380,7 @@ function aiTurn(){
   };
   setTimeout(()=>{
     if(g!==gen) return;
-    if(lv===3&&typeof Worker!=='undefined') askWorker(lv).then(play).catch(()=>play(bestMove(S,me,lv,reps)));
+    if(lv===3&&typeof Worker!=='undefined') askWorker(lv,me).then(play).catch(()=>play(bestMove(S,me,lv,reps)));
     else play(bestMove(S,me,lv,reps));
   },380);
 }
@@ -390,7 +394,7 @@ function mount(container,hooks){
 <div class="wrap"><svg viewBox="0 0 100 100" aria-label="Damebrett">
   <rect width="100" height="100" fill="#0c0a0c"/>
   <g id="squares"></g><g id="grid" class="grid"></g><g id="coords" class="coords"></g><g id="brackets" class="bracket"></g>
-  <g id="marks"></g><g id="stones"></g><g id="hits"></g>
+  <g id="marks"></g><g id="stones"></g><g id="hint" class="hint"></g><g id="hits"></g>
 </svg></div>
 <div class="tray"><span><span class="who s" id="nameB"></span><span id="pcB"></span></span><span>geschlagen <b id="capB">0</b></span></div>`;
   q('hits').addEventListener('click',e=>{ const i=e.target.dataset.i; if(i!==undefined) onTap(+i); });
@@ -403,15 +407,34 @@ function newGame(opts){
   humanSide=opts.starter===2?P2:P1; // "Anfang: Computer" bzw. "Pflaume": der Mensch bzw. Pflaume sitzt unten, Olive beginnt trotzdem
   const nf=opts.starter===2; if(nf!==flip){ flip=nf; drawBoard(); }
   S=newState(); over=false; thinking=false; busy=false; history=[]; sel=-1; pend=null; lastTo=-1; moveNo=0; reps=new Map(); started=true;
-  reps.set(posKey(S),1); H.progress(0); render({reset:true});
+  reps.set(posKey(S),1); hinting=false; H.progress(0); clearHint(); render({reset:true});
   if(!twoPlayer&&S.turn!==humanSide) aiTurn(); else statusForHuman();
 }
 function undo(){
   if(!canUndo()) return;
-  const h=history.pop(); S=h.S; lastTo=h.lastTo; moveNo=h.moveNo; reps=h.reps; sel=-1; pend=null;
+  const h=history.pop(); S=h.S; lastTo=h.lastTo; moveNo=h.moveNo; reps=h.reps; sel=-1; pend=null; clearHint();
   render({reset:true}); statusForHuman();
 }
-function canUndo(){ return started&&!over&&!thinking&&!busy&&!pend&&history.length>0; }
+function canUndo(){ return started&&!over&&!thinking&&!busy&&!pend&&!hinting&&history.length>0; }
+/* Zugvorschlag: Stufe Schwer mit 1500 ms für den Menschen, im Worker wenn möglich; nicht mitten im Mehrfachschlag */
+function canHint(){ return started&&!over&&!thinking&&!busy&&!pend&&!hinting&&!twoPlayer&&isHumanTurn(); }
+function hint(cb){
+  if(!canHint()){ cb(null); return; }
+  hinting=true; sel=-1; const g=gen; render();
+  const done=m=>{ if(g!==gen) return; hinting=false; render(); cb(m||null); };
+  const sync=()=>{ const old=LEVELS[3].budget; LEVELS[3].budget=1500; try{ return bestMove(S,humanSide,3,reps); } finally{ LEVELS[3].budget=old; } };
+  if(typeof Worker!=='undefined') askWorker(3,humanSide,1500).then(done).catch(()=>done(sync()));
+  else setTimeout(()=>done(sync()),30);
+}
+function showHint(m){
+  clearHint(); if(!m||!m.path) return;
+  const Hn=q('hint'), gc=S.turn===P1?'go':'go2';
+  m.path.forEach((i,k)=>{ const [x,y]=xy(i), r=k?2.2:1.4;
+    Hn.insertAdjacentHTML('beforeend',`<path class="${gc}" d="M${x-r} ${y-r}L${x+r} ${y+r}M${x-r} ${y+r}L${x+r} ${y-r}"/>`);
+    if(k) Hn.insertAdjacentHTML('beforeend',`<text x="${x+2.6}" y="${y-2.4}">${k}</text>`); });
+  statusForHuman();
+}
+function clearHint(){ if(root) q('hint').innerHTML=''; }
 function setLevel(l){ level=l; }
 function destroy(){
   gen++; H&&H.progress(0);
@@ -420,8 +443,8 @@ function destroy(){
   if(root){ root.innerHTML=''; root.classList.remove('dame'); root=null; }
   stoneEls={}; started=false; pend=null; H=null;
 }
-const api={meta:META,mount,newGame,undo,canUndo,setLevel,destroy,
-  debug(){ return {S,over,thinking,busy,history,lastTo,sel,pend,stoneEls,twoPlayer,started,flip,humanSide,reps,xy,moveNo,
+const api={meta:META,mount,newGame,undo,canUndo,setLevel,destroy,canHint,hint,showHint,clearHint,
+  debug(){ return {S,over,thinking,hinting,busy,history,lastTo,sel,pend,stoneEls,twoPlayer,started,flip,humanSide,reps,xy,moveNo,
     legal:()=>genMoves(S,S.turn), set:(b,turn)=>{ S={b:b.slice(),turn,nc:0}; reps=new Map([[posKey(S),1]]); history=[]; sel=-1; pend=null; render({reset:true}); statusForHuman(); }}; }};
 if(typeof window!=='undefined'){ window.GAMES=window.GAMES||{}; window.GAMES.dame=api; }
 if(typeof module!=='undefined'&&module.exports) module.exports={P1,P2,RC,NB,COORD,at,owner,isKing,newState,clone,posKey,count,genMoves,apply,isLoss,drawReason,LEVELS,evaluate,search,bestMove,K,meta:META};

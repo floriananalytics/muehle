@@ -39,10 +39,10 @@
   }
   [hidden]{display:none!important}
   .frame{width:100%;max-width:470px}
-  header{display:flex;align-items:flex-end;justify-content:space-between;padding:6px 2px 10px;border-bottom:1px solid var(--elf-15)}
+  header{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:6px 8px;padding:6px 2px 10px;border-bottom:1px solid var(--elf-15)}
   h1{margin:0;font-weight:500;font-size:26px;letter-spacing:.32em;color:var(--elf)}
   h1 small{display:block;font-size:10px;letter-spacing:.18em;color:var(--elf-40);margin-top:2px}
-  .btns{display:flex;gap:6px;flex-shrink:0}
+  .btns{display:flex;gap:6px;flex-shrink:0;margin-left:auto}
   .btns button{white-space:nowrap}
   h1.long{font-size:20px;letter-spacing:.2em}
   @media (max-width:380px){.btns button{padding:7px 7px;font-size:11px} h1{font-size:22px} h1.long{font-size:17px;letter-spacing:.16em}}
@@ -82,12 +82,29 @@
   .corner.bl{bottom:-1px;left:-1px;border-bottom-width:2px;border-left-width:2px}
   .corner.br{bottom:-1px;right:-1px;border-bottom-width:2px;border-right-width:2px}
   .panel h1{margin:0 0 20px}
-  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .tile{padding:10px;border:1px solid var(--rauch);text-align:left;color:var(--elf);border-radius:3px}
+  /* Spielauswahl als Liste: links Vorschau, rechts Name, Untertitel, Bilanz */
+  .tiles{display:grid;grid-template-columns:1fr;gap:10px}
+  .tile{display:flex;align-items:center;gap:14px;padding:8px 12px 8px 8px;border:1px solid var(--rauch);text-align:left;color:var(--elf);border-radius:3px}
   .tile.last{box-shadow:0 0 0 1px var(--tile)} /* zuletzt gespielt: doppelter Akzentrahmen in der Akzentfarbe der Kachel */
-  .tile svg{width:100%;aspect-ratio:1;display:block;margin-bottom:8px}
-  .tile .tname{display:block;font-size:12px;letter-spacing:.18em}
-  .tile small{display:block;font-size:9px;letter-spacing:.14em;color:var(--elf-40);margin-top:3px}
+  .tile svg{width:88px;height:88px;flex-shrink:0;display:block}
+  .tile .info{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .tile .tname{display:block;font-size:16px;letter-spacing:.26em}
+  .tile small{display:block;font-size:9px;letter-spacing:.14em;color:var(--elf-40)}
+  .tile .bal{font-size:10px;letter-spacing:.12em;color:var(--elf-40);margin-top:2px}
+  .sys{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding-top:10px;border-top:1px solid var(--elf-15);font-size:10px;letter-spacing:.14em;color:var(--elf-40)}
+  .sys button{font-size:10px;padding:4px 8px}
+  #gameView{border-color:var(--akzent)}
+  /* Bilanz als drei Zähler im HUD-Stil */
+  .counters{display:flex;gap:8px;padding-top:12px;border-top:1px solid var(--elf-15)}
+  .ctr{flex:1;border:1px solid var(--elf-15);border-left:3px solid var(--akzent);background:var(--schwarz2);padding:6px 8px;min-width:0}
+  .ctr span{display:block;font-size:9px;letter-spacing:.12em;color:var(--elf-40);white-space:nowrap} .ctr b{font-size:16px;font-weight:500}
+  .statfoot{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:10px;letter-spacing:.1em;color:var(--elf-40);min-height:18px}
+  .statfoot b{color:var(--elf);font-weight:500} .statfoot .link{padding:0;font-size:10px}
+  /* Ergebnisfeld unter dem HUD */
+  #result{margin-top:8px;border:1px solid var(--elf-15);border-left:3px solid var(--akzent);background:var(--schwarz2);padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  #result.alarm{border-left-color:var(--rot)} #result.remis{border-left-color:var(--elf)}
+  #result .rline{font-size:13px;letter-spacing:.14em} #result.win .rline{color:var(--akzent-text)}
+  #result .rbtns{display:flex;gap:6px}
   .modes,.actions{display:grid;gap:8px}
   .modes{margin-bottom:16px} .actions{margin:18px 0 16px}
   .big{min-height:56px;width:100%;font-size:15px;letter-spacing:.14em}
@@ -98,9 +115,6 @@
   .seg button{flex:1;min-height:44px;border-radius:0;margin-left:-1px}
   .seg button:first-child{border-radius:3px 0 0 3px;margin-left:0} .seg button:last-child{border-radius:0 3px 3px 0}
   .seg button.on{background:var(--akzent);color:var(--schwarz);border-color:var(--akzent);position:relative;z-index:1}
-  #stats{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--elf-15);font-size:11px;color:var(--elf-40);letter-spacing:.08em}
-  #stats b{color:var(--elf);font-weight:500}
-  #stats button{font-size:10px;padding:4px 8px}
   .link{border:none;padding:12px 0 0;color:var(--elf-40);letter-spacing:.1em;text-decoration:underline;text-underline-offset:3px}
   .link.back{padding:0 0 14px;display:block}
   .phead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
@@ -118,12 +132,14 @@
   <h1 id="title">KONSOLE<small id="subtitle">SPIELESAMMLUNG</small></h1>
   <div class="btns">
     <button id="undoBtn" title="Rückgängig" disabled>◀ Zug</button>
+    <button id="hintBtn" title="Zugvorschlag" disabled>Tipp</button>
     <button id="soundBtn" title="Ton">Ton an</button>
     <button id="menuBtn">Menü</button>
   </div>
 </header>
 <div id="game"></div>
 <div id="hud"><div class="row" id="hudRow"></div><div class="msg" id="hudMsg"></div><i id="bar"></i></div>
+<div id="result" hidden><div class="rline" id="resultLine"></div><div class="rbtns"><button id="rematchBtn">Revanche</button><button id="resultMenuBtn">Menü</button></div></div>
 </div>
 
 <div id="menu" class="overlay" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
@@ -132,6 +148,7 @@
     <h1>KONSOLE<small>SPIELESAMMLUNG</small></h1>
     <div class="tiles" id="tiles"></div>
     <button class="link" id="selResume" hidden>Weiterspielen</button>
+    <div class="sys"><span id="sysVersion">KONSOLE</span><button id="soundBtn2" title="Ton">Ton an</button></div>
   </div>
   <div class="panel" id="gameView" hidden>
     <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
@@ -149,7 +166,8 @@
       <button class="big" id="resumeBtn" hidden>Weiterspielen</button>
       <button class="big" id="newBtn">Neue Partie</button>
     </div>
-    <div id="stats"><span>BILANZ GEGEN COMPUTER: <b id="statW">0</b> Siege | <b id="statD">0</b> Remis | <b id="statL">0</b> Niederlagen</span><button id="statReset">zurücksetzen</button></div>
+    <div class="counters" aria-label="Bilanz gegen Computer"><div class="ctr"><span>SIEGE</span><b id="statW">0</b></div><div class="ctr"><span>REMIS</span><b id="statD">0</b></div><div class="ctr"><span>NIEDERLAGEN</span><b id="statL">0</b></div></div>
+    <div class="statfoot"><span id="statHWrap" hidden>mit Hilfe <b id="statH">0</b></span><button class="link" id="statReset">zurücksetzen</button></div>
     <button class="link" id="rulesBtn">Regeln</button>
   </div>
 </div>
@@ -238,23 +256,24 @@ function applyColors(meta){
 /* ---------- Hülle ---------- */
 const $=id=>document.getElementById(id);
 const GAMES=window.GAMES||{}, GAME_ORDER=['muehle','vier-gewinnt','dame'];
-let game=null, gameId=null, settings={mode:'ai',level:'2',starter:'1'}, stats={w:0,d:0,l:0}, started=false, over=false, twoPlayer=false;
+let game=null, gameId=null, settings={mode:'ai',level:'2',starter:'1'}, stats={w:0,d:0,l:0,h:0}, started=false, over=false, twoPlayer=false, helped=false; // helped: Zugvorschlag in dieser Partie genutzt
+const reduceMotion=()=>!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const restartClass=(el,cls)=>{ el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); };
-function refreshUndo(){ $('undoBtn').disabled=!(game&&started&&!over&&game.canUndo()); }
+function refreshUndo(){ $('undoBtn').disabled=!(game&&started&&!over&&game.canUndo()); $('hintBtn').disabled=!(game&&started&&!over&&!twoPlayer&&game.canHint&&game.canHint()); }
 const hooks={
   sfx:SFX, vibrate:buzz,
   hud(text,cls){ $('hudMsg').textContent=text; $('hud').className=cls||''; refreshUndo(); },
   hudRow(text){ $('hudRow').textContent=text; },
   progress(ms){ const b=$('bar'); b.style.animation='none'; if(ms>0){ void b.offsetWidth; b.style.animation=`barrun ${ms}ms linear forwards`; } },
-  onEnd(r){ // r = {win:1|2} oder {draw:true, grund}
-    over=true; const f=game.meta.farben;
-    if(r.draw){ hooks.hud('Remis'+(r.grund?' - '+r.grund:'.'),'win remis'); SFX.draw(); if(!twoPlayer) stats.d++; }
-    else if(twoPlayer){ hooks.hud(`${f[r.win-1].name} hat gewonnen.`,'win'); SFX.win(); }
-    else if(r.win===1){ hooks.hud('Du hast gewonnen.','win'); SFX.win(); stats.w++; }
-    else { hooks.hud('Der Computer hat gewonnen.','alarm'); SFX.lose(); stats.l++; }
+  onEnd(r){ // r = {win:1|2, human?:1|2} oder {draw:true, grund}; human = Seite des Menschen, sonst Spieler 1
+    over=true; const f=game.meta.farben, human=r.human||1; let line, cls;
+    if(r.draw){ line='Remis'+(r.grund?' - '+r.grund:''); cls='remis'; hooks.hud('Remis'+(r.grund?' - '+r.grund:'.'),'win remis'); SFX.draw(); if(!twoPlayer) stats.d++; }
+    else if(twoPlayer){ line=`${f[r.win-1].name} gewinnt`; cls='win'; hooks.hud(`${f[r.win-1].name} hat gewonnen.`,'win'); SFX.win(); }
+    else if(r.win===human){ line='Sieg'; cls='win'; hooks.hud('Du hast gewonnen.','win'); SFX.win(); stats.w++; if(helped) stats.h++; }
+    else { line='Niederlage'; cls='alarm'; hooks.hud('Der Computer hat gewonnen.','alarm'); SFX.lose(); stats.l++; }
     restartClass($('hud'),'pulse');
     if(!twoPlayer) store.set('stats:'+gameId,stats);
-    refreshUndo();
+    refreshUndo(); showResult(line,cls);
   }
 };
 function saveSettings(){ if(gameId) store.set('settings:'+gameId,{mode:settings.mode,level:settings.level,starter:settings.starter}); }
@@ -267,26 +286,33 @@ function loadGame(id){
   $('levelSeg').innerHTML=m.stufen.map((n,i)=>`<button data-v="${i+1}">${n}</button>`).join('');
   const st=store.get('settings:'+id,{})||{};
   settings={mode:st.mode==='2p'?'2p':'ai', level:m.stufen[+st.level-1]?String(st.level):'2', starter:String(st.starter)==='2'?'2':'1'};
-  const sv=store.get('stats:'+id,{})||{}; stats={w:sv.w||0,d:sv.d||0,l:sv.l||0};
-  started=false; over=false; twoPlayer=settings.mode==='2p';
-  $('hud').className=''; hooks.progress(0);
+  const sv=store.get('stats:'+id,{})||{}; stats={w:sv.w||0,d:sv.d||0,l:sv.l||0,h:sv.h||0};
+  started=false; over=false; helped=false; twoPlayer=settings.mode==='2p';
+  $('hud').className=''; hooks.progress(0); hideResult();
   game.mount($('game'),hooks);
   hooks.hudRow(''); hooks.hud('Neue Partie im Menü starten.');
   store.set('lastGame',id);
 }
 function newGame(){
-  twoPlayer=settings.mode==='2p'; started=true; over=false; saveSettings();
+  twoPlayer=settings.mode==='2p'; started=true; over=false; helped=false; saveSettings(); hideResult();
   game.newGame({twoPlayer,level:+settings.level,starter:+settings.starter});
   refreshUndo();
 }
 
+/* Ergebnisfeld unter dem HUD: erscheint nach dem HUD-Puls */
+function showResult(line,cls){ $('resultLine').textContent=line; $('result').className=cls||''; setTimeout(()=>{ if(over) $('result').hidden=false; },reduceMotion()?0:1250); }
+function hideResult(){ $('result').hidden=true; }
+function rematch(){ if(twoPlayer) settings.starter=settings.starter==='1'?'2':'1'; newGame(); } // gleiche Einstellungen, zu zweit mit getauschtem Anfang
+
 /* Menü und Regeln */
-function buildTiles(){
+const balanceLine=id=>{ const s=store.get('stats:'+id,{})||{}; const w=s.w||0,d=s.d||0,l=s.l||0; return w+d+l?`S ${w} | R ${d} | N ${l}`:'noch keine Partie'; };
+function buildTiles(){ // Liste aus der Modul-Registrierung; ein weiteres Spiel erscheint ohne Änderung an der Hülle
   $('tiles').innerHTML=GAME_ORDER.filter(id=>GAMES[id]).map(id=>{ const m=GAMES[id].meta;
-    return `<button class="tile" data-g="${id}" style="border-color:${m.akzent.hex};--tile:${m.akzent.hex}">${m.vorschau()}<span class="tname">${m.name}</span><small>${m.untertitel}</small></button>`; }).join('');
+    return `<button class="tile" data-g="${id}" style="border-color:${m.akzent.hex};--tile:${m.akzent.hex}">${m.vorschau()}<span class="info"><span class="tname">${m.name}</span><small>${m.untertitel}</small><span class="bal">${balanceLine(id)}</span></span></button>`; }).join('');
 }
 function markLastTile(){ const last=store.get('lastGame',null);
-  for(const t of $('tiles').children){ const on=t.dataset.g===last; t.classList.toggle('last',on); if(on) t.setAttribute('aria-current','true'); else t.removeAttribute('aria-current'); } }
+  for(const t of $('tiles').children){ const on=t.dataset.g===last; t.classList.toggle('last',on); if(on) t.setAttribute('aria-current','true'); else t.removeAttribute('aria-current'); t.querySelector('.bal').textContent=balanceLine(t.dataset.g); } }
+function setSound(on){ soundOn=on; store.set('sound',on); for(const id of ['soundBtn','soundBtn2']) $(id).textContent=on?'Ton an':'Ton aus'; }
 function updateMenu(){
   const ai=settings.mode==='ai', f=game.meta.farben;
   $('modeAi').classList.toggle('on',ai); $('modeAi').setAttribute('aria-pressed',ai);
@@ -297,6 +323,7 @@ function updateMenu(){
   for(const b of sb){ const on=b.dataset.v===settings.starter; b.classList.toggle('on',on); b.setAttribute('aria-pressed',on); }
   $('resumeBtn').hidden=!(started&&!over);
   $('statW').textContent=stats.w; $('statD').textContent=stats.d; $('statL').textContent=stats.l;
+  $('statH').textContent=stats.h; $('statHWrap').hidden=!stats.h;
 }
 function showSelect(){ markLastTile(); $('selectView').hidden=false; $('gameView').hidden=true; $('selResume').hidden=!(started&&!over); const t=$('tiles').querySelector(gameId?`[data-g="${gameId}"]`:'.tile'); if(t) t.focus(); }
 function showGameMenu(){ updateMenu(); $('selectView').hidden=true; $('gameView').hidden=false; ($('resumeBtn').hidden?$('modeAi'):$('resumeBtn')).focus(); }
@@ -319,7 +346,15 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
 
 (function init(){
   buildTiles();
-  $('soundBtn').textContent=soundOn?'Ton an':'Ton aus';
+  setSound(soundOn);
+  fetch('./sw.js').then(r=>r.text()).then(t=>{ const m=t.match(/muehle-v(\d+)/); if(m) $('sysVersion').textContent='KONSOLE v'+m[1]; }).catch(()=>{}); // Versionsnummer nur in sw.js gepflegt
+  $('hintBtn').addEventListener('click',()=>{
+    if(!game||!game.canHint||!game.canHint()) return;
+    helped=true; hooks.hud('Bordcomputer analysiert …'); hooks.progress(1500); refreshUndo();
+    game.hint(m=>{ hooks.progress(0); if(m!==null&&m!==undefined) game.showHint(m); else hooks.hud('Kein Vorschlag möglich.'); refreshUndo(); });
+  });
+  $('rematchBtn').addEventListener('click',rematch);
+  $('resultMenuBtn').addEventListener('click',()=>openMenu('game'));
   $('menuBtn').addEventListener('click',()=>openMenu(game?'game':'select'));
   $('tiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t) return; const id=t.dataset.g;
     if(id===gameId){ showGameMenu(); return; }
@@ -335,8 +370,8 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
   $('mode2p').addEventListener('click',()=>{ settings.mode='2p'; saveSettings(); updateMenu(); });
   $('levelSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.level=v; saveSettings(); game.setLevel(+v); updateMenu(); } }); // Stärke wirkt sofort, auch in der laufenden Partie
   $('startSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.starter=v; saveSettings(); updateMenu(); } });
-  $('soundBtn').addEventListener('click',()=>{ soundOn=!soundOn; $('soundBtn').textContent=soundOn?'Ton an':'Ton aus'; if(soundOn) tone(660,0.08,'triangle'); store.set('sound',soundOn); });
-  $('statReset').addEventListener('click',()=>{ stats={w:0,d:0,l:0}; store.set('stats:'+gameId,stats); updateMenu(); });
+  for(const id of ['soundBtn','soundBtn2']) $(id).addEventListener('click',()=>{ setSound(!soundOn); if(soundOn) tone(660,0.08,'triangle'); });
+  $('statReset').addEventListener('click',()=>{ stats={w:0,d:0,l:0,h:0}; store.set('stats:'+gameId,stats); updateMenu(); });
   $('rulesBtn').addEventListener('click',openRules);
   $('rulesClose').addEventListener('click',closeRules);
   document.addEventListener('keydown',e=>{

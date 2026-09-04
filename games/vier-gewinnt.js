@@ -134,12 +134,14 @@ const CSS=`
 .vier .stone-g{transition:transform .25s ease-in;will-change:transform}
 .vier .flash .stone{animation:vg-flash .15s 2}
 @keyframes vg-flash{0%,100%{opacity:1}50%{opacity:.15}}
-@media (prefers-reduced-motion:reduce){ .vier .stone-g{transition:none} .vier .flash .stone,.vier .winline{animation:none} }`;
+.vier .hint .go,.vier .hint .go2{animation:vg-blink .7s steps(1) infinite}
+@keyframes vg-blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){ .vier .stone-g{transition:none} .vier .flash .stone,.vier .winline,.vier .hint *{animation:none} }`;
 const STEP=12.2, OFFX=13.4, TOPY=11.5, Y0=80; // Spalten x, Vorschau y, unterste Reihe y
 const cx=c=>OFFX+c*STEP, cy=r=>Y0-r*STEP;
 let H=null, root=null, styleEl=null, gen=0, worker=null, workerId=0;
 let S, over=false, thinking=false, history=[], twoPlayer=false, started=false, level=2, lastIdx=-1, selCol=-1, hoverCol=-1, pointerType='mouse';
-let stoneEls={}, winCells=null;
+let stoneEls={}, winCells=null, hinting=false;
 const q=id=>root.querySelector('#'+id);
 const isHumanTurn=()=>twoPlayer||S.turn===P1;
 const farbe=p=>META.farben[p-1].name;
@@ -182,7 +184,7 @@ function renderStones(reset){
 function renderMarks(){
   const M=q('marks'); M.innerHTML='';
   if(lastIdx>=0){ const x=cx((lastIdx/ROWS)|0), y=cy(lastIdx%ROWS); M.insertAdjacentHTML('beforeend',`<rect class="last" x="${x-5.2}" y="${y-5.2}" width="10.4" height="10.4"/>`); }
-  if(started&&!over&&!thinking&&isHumanTurn()){
+  if(started&&!over&&!thinking&&!hinting&&isHumanTurn()){
     const c=selCol>=0?selCol:hoverCol;
     if(c>=0&&S.h[c]<ROWS){ const gc=S.turn===P1?'go':'go2', x=cx(c), y=cy(S.h[c]);
       M.insertAdjacentHTML('beforeend',`<path class="${gc}" d="M${x-1.6} ${y}H${x+1.6}M${x} ${y-1.6}V${y+1.6}"/><path class="${gc}" d="M${x-1.6} ${TOPY}H${x+1.6}M${x} ${TOPY-1.6}V${TOPY+1.6}"/>`); }
@@ -197,7 +199,8 @@ function statusForHuman(){ hud(`${twoPlayer?farbe(S.turn):'Du'}: Spalte wählen.
 function snapshot(){ history.push({S:clone(S),lastIdx}); if(history.length>60) history.shift(); }
 
 function onTap(c){
-  if(!started||over||thinking||!isHumanTurn()||S.h[c]>=ROWS) return;
+  clearHint();
+  if(!started||over||thinking||hinting||!isHumanTurn()||S.h[c]>=ROWS) return;
   if(pointerType!=='mouse'&&selCol!==c){ selCol=c; renderMarks(); return; } // auf Handys: erstes Tippen zeigt Vorschau
   snapshot(); play(c);
 }
@@ -210,13 +213,13 @@ function play(c){
   if(twoPlayer||S.turn===P1){ statusForHuman(); return; }
   aiTurn();
 }
-function askWorker(lv){
+function askWorker(lv,me,budget){
   return new Promise((resolve,reject)=>{
     try{
       if(!worker){ worker=new Worker('./games/vier-gewinnt.js'); worker.onerror=e=>{ const w=worker; worker=null; if(w) w.terminate(); reject(e); }; }
       const id=++workerId, w=worker;
       w.onmessage=e=>{ if(e.data.id===id) resolve(e.data.col); };
-      w.postMessage({b:S.b,h:S.h,turn:S.turn,n:S.n,me:P2,level:lv,budget:LEVELS[3].budget,id});
+      w.postMessage({b:S.b,h:S.h,turn:S.turn,n:S.n,me,level:lv,budget:budget||LEVELS[3].budget,id});
     }catch(e){ reject(e); }
   });
 }
@@ -227,7 +230,7 @@ function aiTurn(){
   const finish=col=>{ if(g!==gen) return; H.progress(0); thinking=false; play(col); };
   setTimeout(()=>{
     if(g!==gen) return;
-    if(lv===3&&typeof Worker!=='undefined') askWorker(lv).then(finish).catch(()=>finish(bestMove(S,P2,lv))); // Rückfall auf den Hauptthread
+    if(lv===3&&typeof Worker!=='undefined') askWorker(lv,P2).then(finish).catch(()=>finish(bestMove(S,P2,lv))); // Rückfall auf den Hauptthread
     else finish(bestMove(S,P2,lv));
   },380);
 }
@@ -238,7 +241,7 @@ function mount(container,hooks){
   styleEl=document.createElement('style'); styleEl.textContent=CSS; document.head.appendChild(styleEl);
   root.innerHTML=`<div class="wrap"><svg viewBox="0 0 100 92" aria-label="Vier-gewinnt-Brett">
   <rect width="100" height="92" fill="#0c0a0c"/>
-  <g id="coords" class="coords"></g><g id="brackets" class="bracket"></g><g id="shafts"></g><g id="pts"></g><g id="marks"></g><g id="stones"></g><g id="win"></g><g id="hits"></g>
+  <g id="coords" class="coords"></g><g id="brackets" class="bracket"></g><g id="shafts"></g><g id="pts"></g><g id="marks"></g><g id="stones"></g><g id="win"></g><g id="hint" class="hint"></g><g id="hits"></g>
 </svg></div>`;
   drawBoard();
   S=newState(P1); started=false; over=false; thinking=false; history=[]; lastIdx=-1; selCol=-1; hoverCol=-1; winCells=null;
@@ -247,15 +250,33 @@ function mount(container,hooks){
 function newGame(opts){
   gen++; twoPlayer=!!opts.twoPlayer; level=opts.level||2;
   S=newState(opts.starter===2?P2:P1); over=false; thinking=false; history=[]; lastIdx=-1; selCol=-1; hoverCol=-1; winCells=null; started=true;
-  H.progress(0); render({reset:true});
+  hinting=false; H.progress(0); clearHint(); render({reset:true});
   if(!twoPlayer&&S.turn===P2) aiTurn(); else statusForHuman();
 }
 function undo(){
   if(!canUndo()) return;
-  const h=history.pop(); S=h.S; lastIdx=h.lastIdx; selCol=-1; winCells=null;
+  const h=history.pop(); S=h.S; lastIdx=h.lastIdx; selCol=-1; winCells=null; clearHint();
   render({reset:true}); statusForHuman();
 }
-function canUndo(){ return started&&!over&&!thinking&&history.length>0; }
+function canUndo(){ return started&&!over&&!thinking&&!hinting&&history.length>0; }
+/* Zugvorschlag: Stufe Schwer mit 1500 ms für den Menschen, im Worker wenn möglich */
+function canHint(){ return started&&!over&&!thinking&&!hinting&&!twoPlayer&&isHumanTurn(); }
+function hint(cb){
+  if(!canHint()){ cb(null); return; }
+  hinting=true; const g=gen; render();
+  const done=c=>{ if(g!==gen) return; hinting=false; render(); cb(c>=0?c:null); };
+  const sync=()=>{ const old=LEVELS[3].budget; LEVELS[3].budget=1500; try{ return bestMove(S,P1,3); } finally{ LEVELS[3].budget=old; } };
+  if(typeof Worker!=='undefined') askWorker(3,P1,1500).then(done).catch(()=>done(sync()));
+  else setTimeout(()=>done(sync()),30);
+}
+function showHint(c){
+  clearHint(); if(c===null||c===undefined||S.h[c]>=ROWS) return;
+  const Hn=q('hint'), gc=S.turn===P1?'go':'go2', x=cx(c), y=cy(S.h[c]);
+  const cross=(x,y,r)=>Hn.insertAdjacentHTML('beforeend',`<path class="${gc}" d="M${x-r} ${y-r}L${x+r} ${y+r}M${x-r} ${y+r}L${x+r} ${y-r}"/>`);
+  cross(x,y,2.2); cross(x,TOPY,2.2);
+  statusForHuman();
+}
+function clearHint(){ if(root) q('hint').innerHTML=''; }
 function setLevel(l){ level=l; }
 function destroy(){
   gen++; H&&H.progress(0);
@@ -264,8 +285,8 @@ function destroy(){
   if(root){ root.innerHTML=''; root.classList.remove('vier'); root=null; }
   stoneEls={}; started=false; H=null;
 }
-const api={meta:META,mount,newGame,undo,canUndo,setLevel,destroy,
-  debug(){ return {S,over,thinking,history,lastIdx,selCol,stoneEls,twoPlayer,started,cx,cy,winCells,setPointer:t=>{pointerType=t;}}; }};
+const api={meta:META,mount,newGame,undo,canUndo,setLevel,destroy,canHint,hint,showHint,clearHint,
+  debug(){ return {S,over,thinking,hinting,history,lastIdx,selCol,stoneEls,twoPlayer,started,cx,cy,winCells,setPointer:t=>{pointerType=t;}}; }};
 if(typeof window!=='undefined'){ window.GAMES=window.GAMES||{}; window.GAMES['vier-gewinnt']=api; }
 if(typeof module!=='undefined'&&module.exports) module.exports={COLS,ROWS,P1,P2,ORDER,WINDOWS,newState,clone,legal,drop,undrop,winLine,isFull,LEVELS,evaluate,immediateWins,search,bestMove,K,meta:META};
 })();
