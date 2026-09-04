@@ -172,6 +172,7 @@
 
 <script src="./games/muehle.js"></script>
 <script src="./games/vier-gewinnt.js"></script>
+<script src="./games/dame.js"></script>
 <script>
 /* ---------- Ton und Vibration ---------- */
 let audio=null, soundOn=true, unlocked=false;
@@ -236,7 +237,7 @@ function applyColors(meta){
 
 /* ---------- Hülle ---------- */
 const $=id=>document.getElementById(id);
-const GAMES=window.GAMES||{}, GAME_ORDER=['muehle','vier-gewinnt'];
+const GAMES=window.GAMES||{}, GAME_ORDER=['muehle','vier-gewinnt','dame'];
 let game=null, gameId=null, settings={mode:'ai',level:'2',starter:'1'}, stats={w:0,d:0,l:0}, started=false, over=false, twoPlayer=false;
 const restartClass=(el,cls)=>{ el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); };
 function refreshUndo(){ $('undoBtn').disabled=!(game&&started&&!over&&game.canUndo()); }
