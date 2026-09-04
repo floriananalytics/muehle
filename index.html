@@ -58,10 +58,12 @@
   @keyframes reveal{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
   /* Bildschirmtasten für Arcade-Module: flache Rechtecke, dünne Elfenbein-Kontur, gedrückt halten möglich */
   #pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
-  #pad.groups{grid-template-columns:1fr 1fr;gap:14px} .padgroup{display:grid;grid-auto-columns:1fr;grid-auto-flow:column;gap:6px}
-  .padgroup.cross{grid-auto-flow:row;grid-template-columns:repeat(3,1fr)} .padgroup button{height:100%} /* Kreuz-Anordnung über zeile/spalte; einzelne Aktionstaste füllt die Höhe */
+  #pad.groups{grid-template-columns:68fr 32fr;gap:10px} .padgroup{display:grid;grid-auto-columns:1fr;grid-auto-flow:column;gap:6px;align-items:stretch} /* Bewegung links 68 %, Aktion rechts 32 % */
+  .padgroup.cross{grid-auto-flow:row;grid-template-columns:repeat(3,1fr);grid-auto-rows:1fr} .padgroup button{height:100%} /* Kreuz als 3x2-Raster mit gleich großen Feldern */
+  #pad .padgroup.single button{font-size:28px} /* einzelne Aktionstaste: Kreuzhöhe, größeres Symbol */
+  #pad button.combo{border:none;background:transparent;font-size:0} #pad button.combo.on{background:var(--elf-15);opacity:.5} /* leere Ecken: Trefferfläche für Diagonalen */
   #game.arcade{touch-action:none}
-  #pad button{min-height:56px;border:1px solid var(--elf-40);border-radius:2px;font-size:20px;color:var(--elf);background:transparent;touch-action:none;user-select:none;-webkit-user-select:none}
+  #pad button{min-height:64px;border:1px solid var(--elf-40);border-radius:2px;font-size:20px;color:var(--elf);background:transparent;touch-action:none;user-select:none;-webkit-user-select:none;padding:0}
   #pad button.on{background:var(--elf-15)}
   #hud{
     position:relative;overflow:hidden;margin-top:6px;border:1px solid var(--elf-15);border-left:3px solid var(--akzent);
@@ -355,8 +357,15 @@ function buildPad(list){ // list: Array (ein Raster) oder {links:[...], rechts:[
   const pad=$('pad'), btn=k=>`<button data-k="${k.id}" aria-label="${k.id}" style="${k.zeile?`grid-row:${k.zeile};`:''}${k.spalte?`grid-column:${k.spalte};`:''}">${k.symbol}</button>`;
   const groups=!Array.isArray(list), items=groups?[...(list.links||[]),...(list.rechts||[])]:list;
   pad.hidden=!items.length; pad.classList.toggle('groups',groups);
-  const grp=arr=>`<div class="padgroup${arr.some(k=>k.zeile||k.spalte)?' cross':''}">${arr.map(btn).join('')}</div>`;
-  pad.innerHTML=groups?grp(list.links||[])+grp(list.rechts||[]):list.map(btn).join('');
+  // leere Zellen eines Kreuzes werden zu Diagonal-Trefferflächen: nächste Taste in der Zeile plus nächste Taste in der Spalte
+  const combos=arr=>{ if(!arr.some(k=>k.zeile)) return ''; const rows=Math.max(...arr.map(k=>k.zeile||1)), out=[];
+    for(let r=1;r<=rows;r++) for(let c=1;c<=3;c++){ if(arr.some(k=>(k.zeile||1)===r&&k.spalte===c)) continue;
+      const near=(list,key,at)=>list.slice().sort((a,b)=>Math.abs(a[key]-at)-Math.abs(b[key]-at))[0];
+      const rowN=near(arr.filter(k=>(k.zeile||1)===r),'spalte',c), colN=near(arr.filter(k=>k.spalte===c),'zeile',r);
+      if(rowN&&colN&&rowN!==colN) out.push(`<button class="combo" data-k="${colN.id}+${rowN.id}" aria-label="${colN.id} und ${rowN.id}" style="grid-row:${r};grid-column:${c}"></button>`); }
+    return out.join(''); };
+  const grp=arr=>`<div class="padgroup${arr.some(k=>k.zeile||k.spalte)?' cross':''}${arr.length===1?' single':''}">${arr.map(btn).join('')}${combos(arr)}</div>`;
+  pad.innerHTML=groups?grp(list.links||[])+grp(list.rechts||[]):list.map(btn).join('')+combos(list);
 }
 function pauseGame(){ if(isArcade()&&started&&!over&&game.isRunning()) game.pause(); openMenu('game'); }
 function resumeGame(){ closeMenu(); if(isArcade()&&started&&!over) game.resume(); }
@@ -436,8 +445,9 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
   $('startBtn').addEventListener('click',()=>confirmEnd(()=>{ newGame(); closeMenu(); }));
   $('resumeBtn2').addEventListener('click',resumeGame);
   $('logReset').addEventListener('click',()=>{ store.set('log:'+gameId,[]); updateMenu(); });
-  $('pad').addEventListener('pointerdown',e=>{ const b=e.target.closest('button'); if(!b) return; e.preventDefault(); b.classList.add('on'); if(hooks.onControl) hooks.onControl(b.dataset.k,true); });
-  for(const ev of ['pointerup','pointercancel','pointerleave']) $('pad').addEventListener(ev,e=>{ const b=e.target.closest('button'); if(!b||!b.classList.contains('on')) return; b.classList.remove('on'); if(hooks.onControl) hooks.onControl(b.dataset.k,false); },true);
+  const padCtl=(b,pressed)=>{ if(hooks.onControl) for(const id of b.dataset.k.split('+')) hooks.onControl(id,pressed); }; // Diagonal-Ecken melden beide Tasten
+  $('pad').addEventListener('pointerdown',e=>{ const b=e.target.closest('button'); if(!b) return; e.preventDefault(); b.classList.add('on'); padCtl(b,true); });
+  for(const ev of ['pointerup','pointercancel','pointerleave']) $('pad').addEventListener(ev,e=>{ const b=e.target.closest('button'); if(!b||!b.classList.contains('on')) return; b.classList.remove('on'); padCtl(b,false); },true);
   // Ziehen auf dem Spielfeld: Fingerbewegung als hooks.onDrag(dx, dy) in Bildschirmpixeln (mehrere Zeiger getrennt)
   const drags=new Map();
   $('game').addEventListener('pointerdown',e=>{ if(hooks.onDrag) drags.set(e.pointerId,[e.clientX,e.clientY]); });

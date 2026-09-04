@@ -68,7 +68,7 @@ const CSS=`
 .sonde .seg{fill:var(--spieler1)}
 .sonde .head{fill:var(--elf)} .sonde .core{fill:var(--schwarz);opacity:.7}
 .sonde .food{fill:var(--spieler2);animation:sd-pulse 1s ease-in-out infinite}
-@keyframes sd-pulse{50%{opacity:.6}} /* abgedunkelte Phase nicht unter 60 % */
+@keyframes sd-pulse{0%,100%{opacity:1}50%{opacity:.6}} /* Blinken nur über die Deckkraft, Farbe bleibt Senf; nicht unter 60 % */
 @media (prefers-reduced-motion:reduce){ .sonde .food{animation:none} }`;
 const OFF=9, CELL=(100-2*OFF)/N;
 const px=x=>OFF+x*CELL;
