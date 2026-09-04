@@ -59,6 +59,7 @@
   /* Bildschirmtasten für Arcade-Module: flache Rechtecke, dünne Elfenbein-Kontur, gedrückt halten möglich */
   #pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
   #pad.groups{grid-template-columns:1fr 1fr;gap:14px} .padgroup{display:grid;grid-auto-columns:1fr;grid-auto-flow:column;gap:6px}
+  .padgroup.cross{grid-auto-flow:row;grid-template-columns:repeat(3,1fr)} .padgroup button{height:100%} /* Kreuz-Anordnung über zeile/spalte; einzelne Aktionstaste füllt die Höhe */
   #game.arcade{touch-action:none}
   #pad button{min-height:56px;border:1px solid var(--elf-40);border-radius:2px;font-size:20px;color:var(--elf);background:transparent;touch-action:none;user-select:none;-webkit-user-select:none}
   #pad button.on{background:var(--elf-15)}
@@ -354,7 +355,8 @@ function buildPad(list){ // list: Array (ein Raster) oder {links:[...], rechts:[
   const pad=$('pad'), btn=k=>`<button data-k="${k.id}" aria-label="${k.id}" style="${k.zeile?`grid-row:${k.zeile};`:''}${k.spalte?`grid-column:${k.spalte};`:''}">${k.symbol}</button>`;
   const groups=!Array.isArray(list), items=groups?[...(list.links||[]),...(list.rechts||[])]:list;
   pad.hidden=!items.length; pad.classList.toggle('groups',groups);
-  pad.innerHTML=groups?`<div class="padgroup">${(list.links||[]).map(btn).join('')}</div><div class="padgroup">${(list.rechts||[]).map(btn).join('')}</div>`:list.map(btn).join('');
+  const grp=arr=>`<div class="padgroup${arr.some(k=>k.zeile||k.spalte)?' cross':''}">${arr.map(btn).join('')}</div>`;
+  pad.innerHTML=groups?grp(list.links||[])+grp(list.rechts||[]):list.map(btn).join('');
 }
 function pauseGame(){ if(isArcade()&&started&&!over&&game.isRunning()) game.pause(); openMenu('game'); }
 function resumeGame(){ closeMenu(); if(isArcade()&&started&&!over) game.resume(); }
@@ -436,10 +438,10 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
   $('logReset').addEventListener('click',()=>{ store.set('log:'+gameId,[]); updateMenu(); });
   $('pad').addEventListener('pointerdown',e=>{ const b=e.target.closest('button'); if(!b) return; e.preventDefault(); b.classList.add('on'); if(hooks.onControl) hooks.onControl(b.dataset.k,true); });
   for(const ev of ['pointerup','pointercancel','pointerleave']) $('pad').addEventListener(ev,e=>{ const b=e.target.closest('button'); if(!b||!b.classList.contains('on')) return; b.classList.remove('on'); if(hooks.onControl) hooks.onControl(b.dataset.k,false); },true);
-  // Ziehen auf dem Spielfeld: horizontale Fingerbewegung als hooks.onDrag(dx) in Bildschirmpixeln (mehrere Zeiger getrennt)
+  // Ziehen auf dem Spielfeld: Fingerbewegung als hooks.onDrag(dx, dy) in Bildschirmpixeln (mehrere Zeiger getrennt)
   const drags=new Map();
-  $('game').addEventListener('pointerdown',e=>{ if(hooks.onDrag) drags.set(e.pointerId,e.clientX); });
-  $('game').addEventListener('pointermove',e=>{ if(!hooks.onDrag||!drags.has(e.pointerId)) return; const dx=e.clientX-drags.get(e.pointerId); drags.set(e.pointerId,e.clientX); if(dx) hooks.onDrag(dx); });
+  $('game').addEventListener('pointerdown',e=>{ if(hooks.onDrag) drags.set(e.pointerId,[e.clientX,e.clientY]); });
+  $('game').addEventListener('pointermove',e=>{ if(!hooks.onDrag||!drags.has(e.pointerId)) return; const [px,py]=drags.get(e.pointerId), dx=e.clientX-px, dy=e.clientY-py; drags.set(e.pointerId,[e.clientX,e.clientY]); if(dx||dy) hooks.onDrag(dx,dy); });
   for(const ev of ['pointerup','pointercancel']) $('game').addEventListener(ev,e=>drags.delete(e.pointerId));
   document.addEventListener('visibilitychange',()=>{ if(document.hidden&&isArcade()&&started&&!over&&game.isRunning()) pauseGame(); }); // App im Hintergrund: automatisch pausieren
   $('tiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t) return; const id=t.dataset.g;
