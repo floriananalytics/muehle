@@ -1,7 +1,7 @@
 // Bei jeder Änderung an der App diese Versionsnummer hochzählen,
 // sonst behalten installierte Geräte die alte Version im Cache.
-const CACHE = 'muehle-v8';
-const FILES = ['./', './index.html', './games/muehle.js', './games/vier-gewinnt.js', './games/dame.js', './manifest.json', './icon-192.png', './icon-512.png', './icon-512-maskable.png'];
+const CACHE = 'muehle-v9';
+const FILES = ['./', './index.html', './games/muehle.js', './games/vier-gewinnt.js', './games/dame.js', './games/sonde.js', './manifest.json', './icon-192.png', './icon-512.png', './icon-512-maskable.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

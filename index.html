@@ -54,6 +54,12 @@
   button:not(:disabled):active{background:var(--elf-15)}
   button:focus-visible{outline:2px solid var(--akzent);outline-offset:2px}
   #game{width:100%;min-height:40px}
+  #game.reveal{animation:reveal .3s steps(20,end)} /* Arcade: Spielfeld erscheint zeilenweise von oben */
+  @keyframes reveal{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0 0 0 0)}}
+  /* Bildschirmtasten für Arcade-Module: flache Rechtecke, dünne Elfenbein-Kontur, gedrückt halten möglich */
+  #pad{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+  #pad button{min-height:56px;border:1px solid var(--elf-40);border-radius:2px;font-size:20px;color:var(--elf);background:transparent;touch-action:none;user-select:none;-webkit-user-select:none}
+  #pad button.on{background:var(--elf-15)}
   #hud{
     position:relative;overflow:hidden;margin-top:6px;border:1px solid var(--elf-15);border-left:3px solid var(--akzent);
     padding:9px 12px;min-height:66px;line-height:1.45;background:var(--schwarz2)
@@ -105,6 +111,12 @@
   #result.alarm{border-left-color:var(--rot)} #result.remis{border-left-color:var(--elf)}
   #result .rline{font-size:13px;letter-spacing:.14em} #result.win .rline{color:var(--akzent-text)}
   #result .rbtns{display:flex;gap:6px}
+  #result .rlog{width:100%;font-size:11px;letter-spacing:.1em;color:var(--elf-40)} #result .rbest{width:100%;font-size:11px;letter-spacing:.14em;color:var(--senf)}
+  /* Logbuch (Arcade) */
+  .lbl.h{margin-top:16px;padding-top:12px;border-top:1px solid var(--elf-15);display:block}
+  .logbook{width:100%;border-collapse:collapse;font-size:11px;letter-spacing:.08em;margin-top:6px}
+  .logbook th{font-weight:500;color:var(--elf-40);text-align:left;padding:4px 6px;font-size:9px;letter-spacing:.12em}
+  .logbook td{padding:5px 6px;border-top:1px solid var(--elf-15)} .logbook td.n,.logbook th.n{text-align:right} .logbook td.leer{color:var(--elf-40)}
   .modes,.actions{display:grid;gap:8px}
   .modes{margin-bottom:16px} .actions{margin:18px 0 16px}
   .big{min-height:56px;width:100%;font-size:15px;letter-spacing:.14em}
@@ -123,7 +135,7 @@
   #confirm .panel{max-width:360px;margin-top:12vh}
   #rulesBody p{margin:0 0 10px;line-height:1.5;font-size:13px}
   #rulesBody p b{color:var(--akzent-text);font-weight:500}
-  @media (prefers-reduced-motion:reduce){ #hud .msg::after,#hud.pulse{animation:none} #bar{display:none} }
+  @media (prefers-reduced-motion:reduce){ #hud .msg::after,#hud.pulse,#game.reveal{animation:none} #bar{display:none} }
 </style>
 </head>
 <body>
@@ -133,13 +145,15 @@
   <div class="btns">
     <button id="undoBtn" title="Rückgängig" disabled>◀ Zug</button>
     <button id="hintBtn" title="Zugvorschlag" disabled>Tipp</button>
+    <button id="pauseBtn" hidden>Pause</button>
     <button id="soundBtn" title="Ton">Ton an</button>
     <button id="menuBtn">Menü</button>
   </div>
 </header>
 <div id="game"></div>
+<div id="pad" hidden></div>
 <div id="hud"><div class="row" id="hudRow"></div><div class="msg" id="hudMsg"></div><i id="bar"></i></div>
-<div id="result" hidden><div class="rline" id="resultLine"></div><div class="rbtns"><button id="rematchBtn">Revanche</button><button id="resultMenuBtn">Menü</button></div></div>
+<div id="result" hidden><div class="rline" id="resultLine"></div><div class="rbtns"><button id="rematchBtn">Revanche</button><button id="resultMenuBtn">Menü</button></div><div class="rlog" id="resultLog" hidden></div><div class="rbest" id="resultBest" hidden>Neuer Bestwert</div></div>
 </div>
 
 <div id="menu" class="overlay" role="dialog" aria-modal="true" aria-labelledby="menuTitle">
@@ -154,6 +168,7 @@
     <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
     <button class="link back" id="backBtn">◀ Zurück zur Spielauswahl</button>
     <h1 id="menuTitle">MÜHLE<small id="menuSubtitle"></small></h1>
+    <div id="boardMenu">
     <div class="modes">
       <button class="big" id="modeAi" aria-pressed="true">Gegen Computer</button>
       <button class="big" id="mode2p" aria-pressed="false">Zwei Spieler</button>
@@ -168,6 +183,13 @@
     </div>
     <div class="counters" aria-label="Bilanz gegen Computer"><div class="ctr"><span>SIEGE</span><b id="statW">0</b></div><div class="ctr"><span>REMIS</span><b id="statD">0</b></div><div class="ctr"><span>NIEDERLAGEN</span><b id="statL">0</b></div></div>
     <div class="statfoot"><span id="statHWrap" hidden>mit Hilfe <b id="statH">0</b></span><button class="link" id="statReset">zurücksetzen</button></div>
+    </div>
+    <div id="arcadeMenu" hidden>
+      <div class="actions"><button class="big" id="resumeBtn2" hidden>Weiterspielen</button><button class="big" id="startBtn">Start</button></div>
+      <span class="lbl h">LOGBUCH</span>
+      <table class="logbook" id="logbook"></table>
+      <div class="statfoot"><span></span><button class="link" id="logReset">zurücksetzen</button></div>
+    </div>
     <button class="link" id="rulesBtn">Regeln</button>
   </div>
 </div>
@@ -191,6 +213,7 @@
 <script src="./games/muehle.js"></script>
 <script src="./games/vier-gewinnt.js"></script>
 <script src="./games/dame.js"></script>
+<script src="./games/sonde.js"></script>
 <script>
 /* ---------- Ton und Vibration ---------- */
 let audio=null, soundOn=true, unlocked=false;
@@ -227,6 +250,7 @@ const SFX={
   win:()=>{ [440,554,659,880].forEach((f,i)=>setTimeout(()=>tone(f,0.18,'triangle'),i*110)); buzz([40,60,40,60]); },
   lose:()=>{ [330,262,196].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'sawtooth',0.05),i*160)); buzz(120); },
   draw:()=>{ tone(494,0.14,'triangle',0.06); setTimeout(()=>tone(494,0.14,'triangle',0.06),200); buzz([30,30]); },
+  arcadeEnd:()=>{ tone(440,0.12,'square',0.05); setTimeout(()=>tone(220,0.22,'square',0.05),140); buzz(120); },
 };
 
 /* ---------- Speicher ---------- */
@@ -255,18 +279,35 @@ function applyColors(meta){
 
 /* ---------- Hülle ---------- */
 const $=id=>document.getElementById(id);
-const GAMES=window.GAMES||{}, GAME_ORDER=['muehle','vier-gewinnt','dame'];
+const GAMES=window.GAMES||{}, GAME_ORDER=['muehle','vier-gewinnt','dame','sonde'];
+const isArcade=()=>!!(game&&game.meta.typ==='arcade');
 let game=null, gameId=null, settings={mode:'ai',level:'2',starter:'1'}, stats={w:0,d:0,l:0,h:0}, started=false, over=false, twoPlayer=false, helped=false; // helped: Zugvorschlag in dieser Partie genutzt
 const reduceMotion=()=>!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const restartClass=(el,cls)=>{ el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); };
-function refreshUndo(){ $('undoBtn').disabled=!(game&&started&&!over&&game.canUndo()); $('hintBtn').disabled=!(game&&started&&!over&&!twoPlayer&&game.canHint&&game.canHint()); }
+function refreshUndo(){ if(isArcade()){ $('pauseBtn').disabled=!(started&&!over); return; } $('undoBtn').disabled=!(game&&started&&!over&&game.canUndo()); $('hintBtn').disabled=!(game&&started&&!over&&!twoPlayer&&game.canHint&&game.canHint()); }
+/* Logbuch (Arcade): bis zu fünf Einträge {score, felder, datum} absteigend */
+const logOf=id=>store.get('log:'+id,[])||[];
+const bestOf=id=>{ const l=logOf(id); return l.length?l[0].score:0; };
+function addLog(id,entry){ const l=logOf(id); l.push(entry); l.sort((a,b)=>b.score-a.score); store.set('log:'+id,l.slice(0,5)); }
+const fmtDate=ts=>{ const d=new Date(ts); return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()%100).padStart(2,'0')}`; };
 const hooks={
-  sfx:SFX, vibrate:buzz,
+  sfx:SFX, vibrate:buzz, tone, onControl:null,
+  bestwert(){ return bestOf(gameId); },
+  telemetry(fields){ $('hudRow').textContent=fields.slice(0,4).map(f=>`${f.label} ${f.value}`).join(' | '); },
   hud(text,cls){ $('hudMsg').textContent=text; $('hud').className=cls||''; refreshUndo(); },
   hudRow(text){ $('hudRow').textContent=text; },
   progress(ms){ const b=$('bar'); b.style.animation='none'; if(ms>0){ void b.offsetWidth; b.style.animation=`barrun ${ms}ms linear forwards`; } },
-  onEnd(r){ // r = {win:1|2, human?:1|2} oder {draw:true, grund}; human = Seite des Menschen, sonst Spieler 1
-    over=true; const f=game.meta.farben, human=r.human||1; let line, cls;
+  onEnd(r){ // Brett: {win:1|2, human?:1|2} oder {draw:true, grund}; Arcade: {score, felder:[{label,value}], bestwert}
+    over=true;
+    if(isArcade()){
+      const best=r.score>bestOf(gameId);
+      if(r.score>0) addLog(gameId,{score:r.score,felder:r.felder||[],datum:Date.now()});
+      hooks.hud(game.meta.endTitel||'ENDE','alarm'); SFX.arcadeEnd(); if(best) setTimeout(SFX.win,400);
+      restartClass($('hud'),'pulse'); refreshUndo();
+      showResult(game.meta.endTitel||'ENDE',best?'win':'alarm',{log:(r.felder||[]).map(f=>`${f.label} ${f.value}`).join(' | '),best});
+      return;
+    }
+    const f=game.meta.farben, human=r.human||1; let line, cls;
     if(r.draw){ line='Remis'+(r.grund?' - '+r.grund:''); cls='remis'; hooks.hud('Remis'+(r.grund?' - '+r.grund:'.'),'win remis'); SFX.draw(); if(!twoPlayer) stats.d++; }
     else if(twoPlayer){ line=`${f[r.win-1].name} gewinnt`; cls='win'; hooks.hud(`${f[r.win-1].name} hat gewonnen.`,'win'); SFX.win(); }
     else if(r.win===human){ line='Sieg'; cls='win'; hooks.hud('Du hast gewonnen.','win'); SFX.win(); stats.w++; if(helped) stats.h++; }
@@ -283,9 +324,13 @@ function loadGame(id){
   applyColors(m);
   $('title').firstChild.textContent=m.name; $('subtitle').textContent=m.untertitel; $('title').classList.toggle('long',m.name.length>8);
   $('menuTitle').firstChild.textContent=m.name; $('menuSubtitle').textContent=m.untertitel;
-  $('levelSeg').innerHTML=m.stufen.map((n,i)=>`<button data-v="${i+1}">${n}</button>`).join('');
+  const arcade=m.typ==='arcade', stufen=m.stufen||[];
+  $('boardMenu').hidden=arcade; $('arcadeMenu').hidden=!arcade;
+  $('undoBtn').hidden=arcade; $('hintBtn').hidden=arcade; $('pauseBtn').hidden=!arcade;
+  buildPad(arcade?(m.steuerung||[]):[]);
+  $('levelSeg').innerHTML=stufen.map((n,i)=>`<button data-v="${i+1}">${n}</button>`).join('');
   const st=store.get('settings:'+id,{})||{};
-  settings={mode:st.mode==='2p'?'2p':'ai', level:m.stufen[+st.level-1]?String(st.level):'2', starter:String(st.starter)==='2'?'2':'1'};
+  settings={mode:st.mode==='2p'?'2p':'ai', level:stufen[+st.level-1]?String(st.level):'2', starter:String(st.starter)==='2'?'2':'1'};
   const sv=store.get('stats:'+id,{})||{}; stats={w:sv.w||0,d:sv.d||0,l:sv.l||0,h:sv.h||0};
   started=false; over=false; helped=false; twoPlayer=settings.mode==='2p';
   $('hud').className=''; hooks.progress(0); hideResult();
@@ -294,18 +339,41 @@ function loadGame(id){
   store.set('lastGame',id);
 }
 function newGame(){
-  twoPlayer=settings.mode==='2p'; started=true; over=false; helped=false; saveSettings(); hideResult();
+  started=true; over=false; helped=false; hideResult();
+  if(isArcade()){ twoPlayer=false; reveal(); game.start(); refreshUndo(); return; }
+  twoPlayer=settings.mode==='2p'; saveSettings();
   game.newGame({twoPlayer,level:+settings.level,starter:+settings.starter});
   refreshUndo();
 }
+function reveal(){ if(reduceMotion()) return; const g=$('game'); restartClass(g,'reveal'); g.addEventListener('animationend',()=>g.classList.remove('reveal'),{once:true}); }
+/* Bildschirmtasten: die Hülle rendert, was meta.steuerung beschreibt, und meldet gedrückt/losgelassen an hooks.onControl */
+function buildPad(list){
+  const pad=$('pad'); pad.hidden=!list.length;
+  pad.innerHTML=list.map(k=>`<button data-k="${k.id}" aria-label="${k.id}" style="${k.zeile?`grid-row:${k.zeile};`:''}${k.spalte?`grid-column:${k.spalte};`:''}">${k.symbol}</button>`).join('');
+}
+function pauseGame(){ if(isArcade()&&started&&!over&&game.isRunning()) game.pause(); openMenu('game'); }
+function resumeGame(){ closeMenu(); if(isArcade()&&started&&!over) game.resume(); }
 
 /* Ergebnisfeld unter dem HUD: erscheint nach dem HUD-Puls */
-function showResult(line,cls){ $('resultLine').textContent=line; $('result').className=cls||''; setTimeout(()=>{ if(over) $('result').hidden=false; },reduceMotion()?0:1250); }
+function showResult(line,cls,extra){
+  $('resultLine').textContent=line; $('result').className=cls||'';
+  $('resultLog').hidden=!(extra&&extra.log); $('resultLog').textContent=extra&&extra.log?extra.log:'';
+  $('resultBest').hidden=!(extra&&extra.best);
+  $('rematchBtn').textContent=isArcade()?'Erneut':'Revanche';
+  setTimeout(()=>{ if(over) $('result').hidden=false; },reduceMotion()?0:1250);
+}
 function hideResult(){ $('result').hidden=true; }
-function rematch(){ if(twoPlayer) settings.starter=settings.starter==='1'?'2':'1'; newGame(); } // gleiche Einstellungen, zu zweit mit getauschtem Anfang
+function rematch(){ if(!isArcade()&&twoPlayer) settings.starter=settings.starter==='1'?'2':'1'; newGame(); } // gleiche Einstellungen, zu zweit mit getauschtem Anfang; Arcade: erneut starten
 
 /* Menü und Regeln */
-const balanceLine=id=>{ const s=store.get('stats:'+id,{})||{}; const w=s.w||0,d=s.d||0,l=s.l||0; return w+d+l?`S ${w} | R ${d} | N ${l}`:'noch keine Partie'; };
+const balanceLine=id=>{
+  if(GAMES[id].meta.typ==='arcade'){ const b=bestOf(id); return b?`Bestwert ${b}`:'noch kein Bestwert'; }
+  const s=store.get('stats:'+id,{})||{}; const w=s.w||0,d=s.d||0,l=s.l||0; return w+d+l?`S ${w} | R ${d} | N ${l}`:'noch keine Partie'; };
+function renderLog(){
+  const l=logOf(gameId), sek=e=>{ const f=(e.felder||[]).find(x=>/sektor/i.test(x.label)); return f?f.value:'-'; };
+  $('logbook').innerHTML='<tr><th>RANG</th><th class="n">PUNKTE</th><th class="n">SEKTOR</th><th class="n">DATUM</th></tr>'+
+    (l.length?l.map((e,i)=>`<tr><td>${i+1}</td><td class="n">${e.score}</td><td class="n">${sek(e)}</td><td class="n">${fmtDate(e.datum)}</td></tr>`).join(''):'<tr><td class="leer" colspan="4">noch kein Eintrag</td></tr>');
+}
 function buildTiles(){ // Liste aus der Modul-Registrierung; ein weiteres Spiel erscheint ohne Änderung an der Hülle
   $('tiles').innerHTML=GAME_ORDER.filter(id=>GAMES[id]).map(id=>{ const m=GAMES[id].meta;
     return `<button class="tile" data-g="${id}" style="border-color:${m.akzent.hex};--tile:${m.akzent.hex}">${m.vorschau()}<span class="info"><span class="tname">${m.name}</span><small>${m.untertitel}</small><span class="bal">${balanceLine(id)}</span></span></button>`; }).join('');
@@ -314,6 +382,7 @@ function markLastTile(){ const last=store.get('lastGame',null);
   for(const t of $('tiles').children){ const on=t.dataset.g===last; t.classList.toggle('last',on); if(on) t.setAttribute('aria-current','true'); else t.removeAttribute('aria-current'); t.querySelector('.bal').textContent=balanceLine(t.dataset.g); } }
 function setSound(on){ soundOn=on; store.set('sound',on); for(const id of ['soundBtn','soundBtn2']) $(id).textContent=on?'Ton an':'Ton aus'; }
 function updateMenu(){
+  if(isArcade()){ $('resumeBtn2').hidden=!(started&&!over); renderLog(); return; }
   const ai=settings.mode==='ai', f=game.meta.farben;
   $('modeAi').classList.toggle('on',ai); $('modeAi').setAttribute('aria-pressed',ai);
   $('mode2p').classList.toggle('on',!ai); $('mode2p').setAttribute('aria-pressed',!ai);
@@ -355,20 +424,27 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
   });
   $('rematchBtn').addEventListener('click',rematch);
   $('resultMenuBtn').addEventListener('click',()=>openMenu('game'));
-  $('menuBtn').addEventListener('click',()=>openMenu(game?'game':'select'));
+  $('menuBtn').addEventListener('click',()=>{ if(isArcade()&&started&&!over) pauseGame(); else openMenu(game?'game':'select'); });
+  $('pauseBtn').addEventListener('click',pauseGame);
+  $('startBtn').addEventListener('click',()=>confirmEnd(()=>{ newGame(); closeMenu(); }));
+  $('resumeBtn2').addEventListener('click',resumeGame);
+  $('logReset').addEventListener('click',()=>{ store.set('log:'+gameId,[]); updateMenu(); });
+  $('pad').addEventListener('pointerdown',e=>{ const b=e.target.closest('button'); if(!b) return; e.preventDefault(); b.classList.add('on'); if(hooks.onControl) hooks.onControl(b.dataset.k,true); });
+  for(const ev of ['pointerup','pointercancel','pointerleave']) $('pad').addEventListener(ev,e=>{ const b=e.target.closest('button'); if(!b||!b.classList.contains('on')) return; b.classList.remove('on'); if(hooks.onControl) hooks.onControl(b.dataset.k,false); },true);
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden&&isArcade()&&started&&!over&&game.isRunning()) pauseGame(); }); // App im Hintergrund: automatisch pausieren
   $('tiles').addEventListener('click',e=>{ const t=e.target.closest('.tile'); if(!t) return; const id=t.dataset.g;
     if(id===gameId){ showGameMenu(); return; }
     confirmEnd(()=>{ loadGame(id); showGameMenu(); }); });
   $('confirmYes').addEventListener('click',()=>{ const a=pendingConfirm; closeConfirm(); if(a) a(); });
   $('confirmNo').addEventListener('click',closeConfirm);
-  $('selResume').addEventListener('click',closeMenu);
+  $('selResume').addEventListener('click',resumeGame);
   $('backBtn').addEventListener('click',showSelect);
   $('newBtn').addEventListener('click',()=>confirmEnd(()=>{ newGame(); closeMenu(); }));
-  $('resumeBtn').addEventListener('click',closeMenu);
+  $('resumeBtn').addEventListener('click',resumeGame);
   $('undoBtn').addEventListener('click',()=>{ if(game) game.undo(); refreshUndo(); });
   $('modeAi').addEventListener('click',()=>{ settings.mode='ai'; saveSettings(); updateMenu(); });
   $('mode2p').addEventListener('click',()=>{ settings.mode='2p'; saveSettings(); updateMenu(); });
-  $('levelSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.level=v; saveSettings(); game.setLevel(+v); updateMenu(); } }); // Stärke wirkt sofort, auch in der laufenden Partie
+  $('levelSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.level=v; saveSettings(); if(game.setLevel) game.setLevel(+v); updateMenu(); } }); // Stärke wirkt sofort, auch in der laufenden Partie
   $('startSeg').addEventListener('click',e=>{ const v=e.target.dataset.v; if(v){ settings.starter=v; saveSettings(); updateMenu(); } });
   for(const id of ['soundBtn','soundBtn2']) $(id).addEventListener('click',()=>{ setSound(!soundOn); if(soundOn) tone(660,0.08,'triangle'); });
   $('statReset').addEventListener('click',()=>{ stats={w:0,d:0,l:0,h:0}; store.set('stats:'+gameId,stats); updateMenu(); });
@@ -378,7 +454,7 @@ function noteNewVersion(){ if(started&&!over){ store.set('newVersion',true); ret
     if(e.key!=='Escape') return;
     if($('confirm').classList.contains('open')) closeConfirm();
     else if($('rules').classList.contains('open')) closeRules();
-    else if($('menu').classList.contains('open')&&started&&!over) closeMenu();
+    else if($('menu').classList.contains('open')&&started&&!over) resumeGame();
   });
   hooks.hud('Spiel im Menü wählen.');
   openMenu('select'); // beim Start immer die Spielauswahl; muehle:lastGame markiert nur die Kachel
