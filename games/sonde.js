@@ -68,7 +68,7 @@ const CSS=`
 .sonde .seg{fill:var(--spieler1)}
 .sonde .head{fill:var(--elf)} .sonde .core{fill:var(--schwarz);opacity:.7}
 .sonde .food{fill:var(--spieler2);animation:sd-pulse 1s ease-in-out infinite}
-@keyframes sd-pulse{50%{opacity:.35}}
+@keyframes sd-pulse{50%{opacity:.6}} /* abgedunkelte Phase nicht unter 60 % */
 @media (prefers-reduced-motion:reduce){ .sonde .food{animation:none} }`;
 const OFF=9, CELL=(100-2*OFF)/N;
 const px=x=>OFF+x*CELL;
@@ -97,7 +97,7 @@ function render(){ // Elemente werden wiederverwendet, nur Positionen ändern si
   if(g.food){ foodEl.removeAttribute('display'); place(foodEl,g.food[0],g.food[1],CELL-0.7); } else foodEl.setAttribute('display','none');
 }
 function telemetry(){
-  H.telemetry([{label:'PUNKTE',value:String(g.score).padStart(4,'0')},{label:'SEKTOR',value:g.sector},{label:'LÄNGE',value:g.body.length},{label:'BESTWERT',value:String(H.bestwert?H.bestwert():0).padStart(4,'0')}]);
+  H.telemetry([{label:'PUNKTE',value:String(g.score).padStart(4,'0')},{label:'SEKTOR',value:g.sector},{label:'LÄNGE',value:g.body.length},{label:'BESTWERT',value:String(Math.max(H.bestwert?H.bestwert():0,g.score)).padStart(4,'0')}]);
 }
 function toneSignal(){ H.tone(520+g.sector*40,0.06,'square',0.05); H.vibrate(10); }
 function toneSector(){ H.tone(660,0.08,'square',0.05); setTimeout(()=>H.tone(880,0.1,'square',0.05),100); H.vibrate([30,30]); }
